@@ -1,0 +1,108 @@
+package io.github.alirezajavan10.downpour.internal.data
+
+import io.github.alirezajavan10.downpour.api.DownloadError
+import io.github.alirezajavan10.downpour.api.DownloadItem
+import io.github.alirezajavan10.downpour.internal.data.db.DownloadDao
+import io.github.alirezajavan10.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan10.downpour.internal.data.db.DownloadPartEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+internal class DownloadRepository(
+    private val dao: DownloadDao,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    suspend fun insert(entity: DownloadEntity) = dao.upsert(entity)
+
+    suspend fun getEntity(id: String): DownloadEntity? = dao.getById(id)
+
+    suspend fun getItem(id: String): DownloadItem? = dao.getById(id)?.toItem()
+
+    suspend fun getAllItems(): List<DownloadItem> = dao.getAll().map { it.toItem() }
+
+    fun observeItem(id: String): Flow<DownloadItem?> = dao.observeById(id).map { it?.toItem() }
+
+    fun observeAllItems(): Flow<List<DownloadItem>> = dao.observeAll().map { entities -> entities.map { it.toItem() } }
+
+    suspend fun nextQueued(limit: Int): List<DownloadEntity> =
+        dao.getByStatuses(listOf(DownloadStatus.QUEUED, DownloadStatus.WAITING_FOR_NETWORK), limit)
+
+    suspend fun runningEntities(): List<DownloadEntity> = dao.getByStatuses(listOf(DownloadStatus.RUNNING), Int.MAX_VALUE)
+
+    suspend fun runningCount(): Int = dao.countByStatus(DownloadStatus.RUNNING)
+
+    suspend fun setStatus(
+        id: String,
+        status: DownloadStatus,
+    ) = dao.updateStatus(id, status, clock())
+
+    suspend fun setDestinationPath(
+        id: String,
+        path: String,
+    ) = dao.updateDestinationPath(id, path, clock())
+
+    suspend fun setStatusIn(
+        from: List<DownloadStatus>,
+        to: DownloadStatus,
+    ) = dao.updateStatusIn(from, to, clock())
+
+    suspend fun getByTag(tag: String): List<DownloadEntity> = dao.getByTag(tag)
+
+    suspend fun setStatusByTag(
+        tag: String,
+        from: List<DownloadStatus>,
+        to: DownloadStatus,
+    ) = dao.updateStatusByTag(tag, from, to, clock())
+
+    suspend fun deleteByTag(tag: String) = dao.deleteByTag(tag)
+
+    suspend fun setProgress(
+        id: String,
+        downloaded: Long,
+        total: Long,
+        speed: Long,
+        eta: Long,
+    ) = dao.updateProgress(id, downloaded, total, speed, eta, clock())
+
+    suspend fun setResumeMetadata(
+        id: String,
+        supportsResume: Boolean,
+        total: Long,
+        etag: String?,
+        lastModified: String?,
+    ) = dao.updateResumeMetadata(id, supportsResume, total, etag, lastModified, clock())
+
+    suspend fun setError(
+        id: String,
+        error: DownloadError,
+        retryCount: Int,
+    ) {
+        val encoded = ErrorCodec.encode(error)
+        dao.updateError(
+            id = id,
+            status = DownloadStatus.FAILED,
+            errorType = encoded.type,
+            errorMessage = encoded.message,
+            httpCode = encoded.httpCode,
+            retryCount = retryCount,
+            now = clock(),
+        )
+    }
+
+    suspend fun delete(id: String) = dao.delete(id)
+
+    suspend fun replaceParts(parts: List<DownloadPartEntity>) {
+        if (parts.isEmpty()) return
+        dao.deleteParts(parts.first().downloadId)
+        dao.insertParts(parts)
+    }
+
+    suspend fun getParts(downloadId: String): List<DownloadPartEntity> = dao.getParts(downloadId)
+
+    suspend fun setPartOffset(
+        partId: Long,
+        offset: Long,
+    ) = dao.updatePartOffset(partId, offset)
+
+    suspend fun clearParts(downloadId: String) = dao.deleteParts(downloadId)
+}
