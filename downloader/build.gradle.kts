@@ -86,6 +86,13 @@ dependencies {
 }
 
 mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.AndroidSingleVariantLibrary(
+            variant = "release",
+            sourcesJar = com.vanniktech.maven.publish.SourcesJar.Sources(),
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Dokka("dokkaHtml"),
+        ),
+    )
     publishToMavenCentral(automaticRelease = true)
     signAllPublications()
     pom {

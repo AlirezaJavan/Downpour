@@ -27,7 +27,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.alirezajavan10:downpour:1.0.0")
+    implementation("io.github.alirezajavan10:downpour:0.1.0")
 }
 ```
 
@@ -81,15 +81,14 @@ We welcome contributions! To get started:
 1.  **Fork** the repository.
 2.  **Clone** your fork.
 3.  **Create a branch** for your feature or fix.
-4.  **Format** your code: Run `./gradlew spotlessApply` to ensure consistent style.
+4.  **Style**: Follow the official Kotlin style guide (`kotlin.code.style=official`); the library enforces `explicitApi()`, so every public declaration needs an explicit visibility.
 5.  **Test** your changes: Ensure all tests pass with `./gradlew test`.
 6.  **Submit a Pull Request** with a detailed description of your changes.
 
 ### Development Requirements
-- JDK 17
-- Android SDK 35+
-- A Git client with pre-commit hook support (configured automatically).
+- JDK 17 or newer (the Gradle daemon and Android Gradle Plugin require 17+).
+- Android SDK with API 37 installed.
 
 ## License
 
-Downpour is available under the MIT License. See [LICENSE](LICENSE) for details.
+Downpour is available under the Apache License 2.0. See [LICENSE](LICENSE) for details.
