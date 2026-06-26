@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import io.github.alirezajavan10.downpour.api.DownloadItem
 import io.github.alirezajavan10.downpour.api.DownloadState
 import io.github.alirezajavan10.downpour.api.NotificationConfig
+import io.github.alirezajavan10.downpour.internal.util.ByteFormatter
 
 internal class DownloadNotificationFactory(
     private val context: Context,

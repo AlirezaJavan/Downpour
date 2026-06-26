@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.alirezajavan10.downpour.api.ConflictStrategy
 import io.github.alirezajavan10.downpour.api.DownloadDestination
 import io.github.alirezajavan10.downpour.api.DownloadItem
+import io.github.alirezajavan10.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan10.downpour.api.Downpour
 import io.github.alirezajavan10.downpour.api.NetworkType
 import io.github.alirezajavan10.downpour.api.Priority
@@ -19,7 +20,11 @@ import java.io.File
 class DownloadsViewModel(
     application: Application,
 ) : AndroidViewModel(application) {
-    private val manager = Downpour.getInstance(application)
+    private val config =
+        DownloadManagerConfig(
+            verbose = true,
+        )
+    private val manager = Downpour.getInstance(application, config)
 
     val downloads: StateFlow<List<DownloadItem>> =
         manager
@@ -71,6 +76,6 @@ class DownloadsViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
-        const val MAX_CONNECTIONS = 4
+        const val MAX_CONNECTIONS = 2
     }
 }

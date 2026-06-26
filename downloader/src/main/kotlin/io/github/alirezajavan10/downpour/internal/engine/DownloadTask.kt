@@ -11,6 +11,7 @@ import io.github.alirezajavan10.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan10.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan10.downpour.internal.network.RemoteFileInfo
 import io.github.alirezajavan10.downpour.internal.util.FilenameResolver
+import io.github.alirezajavan10.downpour.internal.util.Logger
 import io.github.alirezajavan10.downpour.internal.util.SpeedMeter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -32,6 +33,7 @@ internal class DownloadTask(
     private val globalRateLimiter: RateLimiter,
     private val ioDispatcher: CoroutineDispatcher,
     private val fileStore: FileStore,
+    private val logger: Logger,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun run(entity: DownloadEntity): TaskResult =
@@ -51,6 +53,7 @@ internal class DownloadTask(
         }
 
     private suspend fun download(entity: DownloadEntity): TaskResult {
+        logger.d("Executing task for ${entity.id}")
         val initialDestination = entity.toDestination()
         val info = probe(entity)
         val resolvedDestination = resolveDestination(entity, initialDestination, info)
@@ -69,6 +72,7 @@ internal class DownloadTask(
 
         val activeConnections = calculateDynamicConnections(entity)
         val plan = planner.plan(currentEntity, info, fileStore.lengthOf(currentDestination), activeConnections)
+        logger.d("Download plan for ${entity.id}: $plan")
 
         ensureSpace(currentDestination, plan)
         if (plan.isMultiConnection) fileStore.preallocate(currentDestination, plan.totalBytes)
@@ -186,7 +190,7 @@ internal class DownloadTask(
         try {
             runParts(transfer)
         } finally {
-            withContext(NonCancellable) { persistOffsets(transfer) }
+            withContext(NonCancellable) { persistProgress(transfer) }
         }
         verifyCompleteness(transfer)
     }
@@ -228,27 +232,17 @@ internal class DownloadTask(
         val meter = SpeedMeter(clock = clock)
         while (true) {
             delay(config.progressUpdateInterval)
-            flushProgress(transfer, meter)
-            persistOffsets(transfer)
+            val downloaded = transfer.progress.get()
+            val reading = meter.sample(downloaded, transfer.plan.totalBytes)
+            persistProgress(transfer, reading.bytesPerSecond, reading.etaMillis)
         }
     }
 
-    private suspend fun flushProgress(
+    private suspend fun persistProgress(
         transfer: ActiveTransfer,
-        meter: SpeedMeter,
+        speed: Long = 0,
+        eta: Long = 0,
     ) {
-        val downloaded = transfer.progress.get()
-        val reading = meter.sample(downloaded, transfer.plan.totalBytes)
-        repository.setProgress(
-            id = transfer.entity.id,
-            downloaded = downloaded,
-            total = transfer.plan.totalBytes,
-            speed = reading.bytesPerSecond,
-            eta = reading.etaMillis,
-        )
-    }
-
-    private suspend fun persistOffsets(transfer: ActiveTransfer) {
         if (transfer.plan.isMultiConnection) {
             transfer.offsets.forEach { (partId, offset) ->
                 repository.setPartOffset(partId, offset.get())
@@ -258,8 +252,8 @@ internal class DownloadTask(
             id = transfer.entity.id,
             downloaded = transfer.progress.get(),
             total = transfer.plan.totalBytes,
-            speed = 0,
-            eta = 0,
+            speed = speed,
+            eta = eta,
         )
     }
 

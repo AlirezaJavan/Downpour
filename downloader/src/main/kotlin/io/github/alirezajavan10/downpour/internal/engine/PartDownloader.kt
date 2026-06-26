@@ -3,6 +3,7 @@ package io.github.alirezajavan10.downpour.internal.engine
 import io.github.alirezajavan10.downpour.api.DownloadDestination
 import io.github.alirezajavan10.downpour.api.DownloadError
 import io.github.alirezajavan10.downpour.internal.network.HttpDownloadDataSource
+import io.github.alirezajavan10.downpour.internal.util.Logger
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import okhttp3.Response
@@ -12,10 +13,12 @@ import java.util.concurrent.atomic.AtomicLong
 internal class PartDownloader(
     private val dataSource: HttpDownloadDataSource,
     private val fileStore: FileStore,
+    private val logger: Logger,
     private val bufferSize: Int = DEFAULT_BUFFER_SIZE,
 ) {
     suspend fun download(context: PartContext) {
         val resolved = resolveRange(context.part)
+        logger.d("Starting part ${context.part.partId} for ${context.url} (Resolved Range: ${resolved.rangeStart}-${resolved.rangeEnd})")
         val response =
             dataSource.open(
                 url = context.url,
@@ -54,16 +57,21 @@ internal class PartDownloader(
         context: PartContext,
     ): ResolvedRange {
         if (resolved.rangeStart == null) {
-            if (!response.isSuccessful) throw DownloadError.Http(response.code)
+            if (!response.isSuccessful) throw response.toHttpError()
             return resolved
         }
         if (response.code == HTTP_PARTIAL) return resolved
-        if (!response.isSuccessful) throw DownloadError.Http(response.code)
+        if (!response.isSuccessful) throw response.toHttpError()
         if (context.isMultiConnection) {
             throw DownloadError.ContentValidation("Server stopped honoring range requests")
         }
         context.progress.addAndGet(-context.part.downloaded)
         return resolved.copy(writePosition = 0)
+    }
+
+    private fun Response.toHttpError(): DownloadError.Http {
+        val retryAfter = header("Retry-After")?.toLongOrNull()
+        return DownloadError.Http(code, retryAfter)
     }
 
     private suspend fun pump(

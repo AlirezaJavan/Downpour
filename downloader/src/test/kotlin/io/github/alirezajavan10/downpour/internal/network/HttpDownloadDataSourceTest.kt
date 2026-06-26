@@ -2,6 +2,7 @@ package io.github.alirezajavan10.downpour.internal.network
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alirezajavan10.downpour.api.DownloadProgress
+import io.github.alirezajavan10.downpour.internal.util.NoOpLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -19,7 +20,7 @@ class HttpDownloadDataSourceTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        dataSource = HttpDownloadDataSource(OkHttpClient(), Dispatchers.Unconfined)
+        dataSource = HttpDownloadDataSource(OkHttpClient(), Dispatchers.Unconfined, NoOpLogger)
     }
 
     @After

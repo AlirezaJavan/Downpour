@@ -4,6 +4,7 @@ import io.github.alirezajavan10.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan10.downpour.api.DownloadRequest
 import io.github.alirezajavan10.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan10.downpour.internal.engine.DownloadEngine
+import io.github.alirezajavan10.downpour.internal.util.NoOpLogger
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.TestScope
@@ -15,7 +16,7 @@ class DefaultDownloadManagerTest {
     private val engine = mockk<DownloadEngine>(relaxed = true)
     private val testScope = TestScope()
     private val config = DownloadManagerConfig()
-    private val manager = DefaultDownloadManager(repository, engine, testScope, config)
+    private val manager = DefaultDownloadManager(repository, engine, testScope, config, NoOpLogger)
 
     @Test
     fun `enqueue inserts into repository and notifies engine`() =

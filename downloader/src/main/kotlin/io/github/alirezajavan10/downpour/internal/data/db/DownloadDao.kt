@@ -52,11 +52,13 @@ internal interface DownloadDao {
     )
 
     @Query(
-        "UPDATE downloads SET status = :to, updatedAtMillis = :now WHERE status IN (:from)",
+        "UPDATE downloads SET status = :to, updatedAtMillis = :now " +
+            "WHERE status IN (:from) AND id NOT IN (:excludeIds)",
     )
-    suspend fun updateStatusIn(
+    suspend fun updateStatusInExcept(
         from: List<DownloadStatus>,
         to: DownloadStatus,
+        excludeIds: List<String>,
         now: Long,
     )
 

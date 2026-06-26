@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alirezajavan10.downpour.api.DownloadDestination
 import io.github.alirezajavan10.downpour.api.DownloadItem
 import io.github.alirezajavan10.downpour.api.DownloadState
+import io.github.alirezajavan10.downpour.internal.util.ByteFormatter
 
 @Composable
 public fun DownloadItemCard(
@@ -59,11 +60,33 @@ public fun DownloadItemCard(
 
 private fun describe(state: DownloadState): String =
     when (state) {
-        is DownloadState.Queued -> "Queued"
-        is DownloadState.Running -> "${state.progress.percent}% • ${state.progress.bytesPerSecond} B/s"
-        is DownloadState.Paused -> "Paused at ${state.progress.percent}%"
-        is DownloadState.Completed -> "Completed"
-        is DownloadState.Failed -> "Failed: ${state.error.message}"
-        is DownloadState.Cancelled -> "Cancelled"
-        is DownloadState.WaitingForNetwork -> "Waiting for network"
+        is DownloadState.Queued -> {
+            "Queued"
+        }
+
+        is DownloadState.Running -> {
+            val speed = ByteFormatter.formatSpeed(state.progress.bytesPerSecond)
+            val speedPart = if (speed.isNotEmpty()) " • $speed" else ""
+            "${state.progress.percent}%$speedPart"
+        }
+
+        is DownloadState.Paused -> {
+            "Paused at ${state.progress.percent}%"
+        }
+
+        is DownloadState.Completed -> {
+            "Completed"
+        }
+
+        is DownloadState.Failed -> {
+            "Failed: ${state.error.message}"
+        }
+
+        is DownloadState.Cancelled -> {
+            "Cancelled"
+        }
+
+        is DownloadState.WaitingForNetwork -> {
+            "Waiting for network"
+        }
     }

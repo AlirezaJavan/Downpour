@@ -1,4 +1,4 @@
-package io.github.alirezajavan10.downpour.internal.service
+package io.github.alirezajavan10.downpour.internal.util
 
 import java.util.Locale
 

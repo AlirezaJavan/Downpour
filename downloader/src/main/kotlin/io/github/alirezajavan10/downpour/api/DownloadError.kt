@@ -14,6 +14,7 @@ public sealed class DownloadError(
 
     public class Http(
         public val statusCode: Int,
+        public val retryAfterSeconds: Long? = null,
     ) : DownloadError("Unexpected HTTP status code: $statusCode", null)
 
     public class InsufficientStorage(

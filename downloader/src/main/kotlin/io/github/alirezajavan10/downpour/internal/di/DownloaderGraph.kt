@@ -18,11 +18,15 @@ import io.github.alirezajavan10.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan10.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan10.downpour.internal.service.DownloadNotificationFactory
 import io.github.alirezajavan10.downpour.internal.service.ForegroundServiceController
+import io.github.alirezajavan10.downpour.internal.util.AndroidLogger
+import io.github.alirezajavan10.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.Dns
 import okhttp3.OkHttpClient
+import java.net.Inet4Address
 import java.util.concurrent.TimeUnit
 
 internal class DownloaderGraph private constructor(
@@ -32,6 +36,7 @@ internal class DownloaderGraph private constructor(
     private val appContext = context.applicationContext
     private val ioDispatcher = Dispatchers.IO
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val logger: Logger = AndroidLogger(config.verbose)
 
     private val database =
         Room
@@ -47,15 +52,20 @@ internal class DownloaderGraph private constructor(
     private val httpClient =
         (config.okHttpClient ?: OkHttpClient())
             .newBuilder()
-            .connectTimeout(config.connectTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            .apply {
+                if (config.preferIpv4) {
+                    dns(IPv4OnlyDns)
+                }
+            }.connectTimeout(config.connectTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .readTimeout(config.readTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .retryOnConnectionFailure(true)
+            .fastFallback(true)
             .build()
 
-    private val dataSource = HttpDownloadDataSource(httpClient, ioDispatcher)
+    private val dataSource = HttpDownloadDataSource(httpClient, ioDispatcher, logger)
     private val fileStore = AndroidFileStore(appContext)
     private val planner = DownloadPlanner(repository, config)
-    private val partDownloader = PartDownloader(dataSource, fileStore)
+    private val partDownloader = PartDownloader(dataSource, fileStore, logger)
     private val globalRateLimiter = RateLimiter(config.maxBytesPerSecond)
 
     val notificationManager =
@@ -78,6 +88,7 @@ internal class DownloaderGraph private constructor(
             globalRateLimiter = globalRateLimiter,
             ioDispatcher = ioDispatcher,
             fileStore = fileStore,
+            logger = logger,
         )
     }
 
@@ -90,12 +101,27 @@ internal class DownloaderGraph private constructor(
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             fileStore = fileStore,
+            logger = logger,
         )
 
-    val downloadManager: DownloadManager = DefaultDownloadManager(repository, engine, scope, config)
+    val downloadManager: DownloadManager =
+        DefaultDownloadManager(
+            repository = repository,
+            engine = engine,
+            scope = scope,
+            config = config,
+            logger = logger,
+        )
 
     init {
         scope.launch { engine.recover() }
+    }
+
+    private object IPv4OnlyDns : Dns {
+        override fun lookup(hostname: String) =
+            Dns.SYSTEM.lookup(hostname).filter { it is Inet4Address }.ifEmpty {
+                Dns.SYSTEM.lookup(hostname)
+            }
     }
 
     companion object {
@@ -105,9 +131,24 @@ internal class DownloaderGraph private constructor(
         fun getInstance(
             context: Context,
             config: DownloadManagerConfig = DownloadManagerConfig(),
-        ): DownloaderGraph =
-            instance ?: synchronized(this) {
+        ): DownloaderGraph {
+            val current = instance
+            if (current != null) {
+                // If config changed, we might need to update internal state.
+                // For simplicity in this fix, we just return the existing instance,
+                // but in a real app, you should kill the process or handle dynamic config.
+                return current
+            }
+            return synchronized(this) {
                 instance ?: DownloaderGraph(context, config).also { instance = it }
             }
+        }
+
+        // Added for testing and debugging to allow fresh start with new config
+        internal fun destroyInstance() {
+            synchronized(this) {
+                instance = null
+            }
+        }
     }
 }

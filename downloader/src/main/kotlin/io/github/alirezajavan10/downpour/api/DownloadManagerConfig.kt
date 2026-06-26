@@ -17,6 +17,8 @@ public data class DownloadManagerConfig(
     val interceptors: List<DownloadInterceptor> = emptyList(),
     val workerFactory: DownloadWorkerFactory = DefaultDownloadWorkerFactory,
     val notification: NotificationConfig = NotificationConfig(),
+    val verbose: Boolean = false,
+    val preferIpv4: Boolean = false,
 ) {
     init {
         require(maxConcurrentDownloads >= 1) { "maxConcurrentDownloads must be >= 1" }

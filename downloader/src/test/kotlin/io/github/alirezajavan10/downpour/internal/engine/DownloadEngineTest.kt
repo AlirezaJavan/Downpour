@@ -5,6 +5,7 @@ import io.github.alirezajavan10.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan10.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan10.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan10.downpour.internal.network.NetworkMonitor
+import io.github.alirezajavan10.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -31,6 +32,7 @@ class DownloadEngineTest {
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             fileStore = fileStore,
+            logger = NoOpLogger,
         )
 
     @Test

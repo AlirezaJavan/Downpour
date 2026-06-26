@@ -9,6 +9,7 @@ import io.github.alirezajavan10.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan10.downpour.internal.data.toDiagnosticReport
 import io.github.alirezajavan10.downpour.internal.data.toEntity
 import io.github.alirezajavan10.downpour.internal.engine.DownloadEngine
+import io.github.alirezajavan10.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -19,15 +20,18 @@ internal class DefaultDownloadManager(
     private val engine: DownloadEngine,
     private val scope: CoroutineScope,
     private val config: DownloadManagerConfig,
+    private val logger: Logger,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idProvider: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadManager {
     override fun enqueue(request: DownloadRequest): String {
+        logger.d("Enqueuing request: $request")
         val intercepted =
             config.interceptors.fold(request) { req, interceptor ->
                 interceptor.intercept(req)
             }
         val id = idProvider()
+        logger.i("Enqueued download $id for URL: ${intercepted.url}")
         scope.launch {
             repository.insert(intercepted.toEntity(id, clock()))
             engine.onEnqueued()

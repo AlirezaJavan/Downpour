@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.alirezajavan10.downpour.compose.DownloadItemCard
 
-private const val SAMPLE_URL = "https://speed.hetzner.de/100MB.bin"
+private const val SAMPLE_URL = "https://ash-speed.hetzner.com/100MB.bin"
 
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel) {

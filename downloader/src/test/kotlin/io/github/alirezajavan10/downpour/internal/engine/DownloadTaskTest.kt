@@ -7,6 +7,7 @@ import io.github.alirezajavan10.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan10.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan10.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan10.downpour.internal.network.RemoteFileInfo
+import io.github.alirezajavan10.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -33,6 +34,7 @@ class DownloadTaskTest {
             globalRateLimiter = globalRateLimiter,
             ioDispatcher = Dispatchers.Unconfined,
             fileStore = fileStore,
+            logger = NoOpLogger,
         )
 
     @Test

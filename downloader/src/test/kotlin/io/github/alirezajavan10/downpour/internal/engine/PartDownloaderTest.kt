@@ -3,6 +3,7 @@ package io.github.alirezajavan10.downpour.internal.engine
 import io.github.alirezajavan10.downpour.api.DownloadDestination
 import io.github.alirezajavan10.downpour.api.DownloadError
 import io.github.alirezajavan10.downpour.internal.network.HttpDownloadDataSource
+import io.github.alirezajavan10.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -16,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong
 class PartDownloaderTest {
     private val dataSource = mockk<HttpDownloadDataSource>()
     private val fileStore = mockk<FileStore>()
-    private val partDownloader = PartDownloader(dataSource, fileStore)
+    private val partDownloader = PartDownloader(dataSource, fileStore, NoOpLogger)
 
     @Test
     fun `download calls datasource and writes to file`() =

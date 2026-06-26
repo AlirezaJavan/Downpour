@@ -44,7 +44,12 @@ internal class DownloadRepository(
     suspend fun setStatusIn(
         from: List<DownloadStatus>,
         to: DownloadStatus,
-    ) = dao.updateStatusIn(from, to, clock())
+        excludeIds: List<String> = emptyList(),
+    ) = if (excludeIds.isEmpty()) {
+        dao.updateStatusInExcept(from, to, listOf(""), clock())
+    } else {
+        dao.updateStatusInExcept(from, to, excludeIds, clock())
+    }
 
     suspend fun getByTag(tag: String): List<DownloadEntity> = dao.getByTag(tag)
 
