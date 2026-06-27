@@ -1,6 +1,6 @@
 # Downpour
 
-[![Android CI](https://github.com/alirezajavan10/downpour/actions/workflows/android.yml/badge.svg)](https://github.com/alirezajavan10/downpour/actions/workflows/android.yml)
+[![Android CI](https://github.com/alirezajavan/downpour/actions/workflows/android.yml/badge.svg)](https://github.com/alirezajavan/downpour/actions/workflows/android.yml)
 
 **Downpour** is a production-grade, coroutine-first download manager library for Android. It is designed to be highly reliable, performant, and easy to integrate into modern Android applications.
 
@@ -27,7 +27,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.alirezajavan10:downpour:0.1.0")
+    implementation("io.github.alirezajavan:downpour:0.1.0")
 }
 ```
 

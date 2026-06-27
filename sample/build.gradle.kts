@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.alirezajavan10.downpour.sample"
+    namespace = "io.github.alirezajavan.downpour.sample"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.alirezajavan10.downpour.sample"
+        applicationId = "io.github.alirezajavan.downpour.sample"
         minSdk = 23
         targetSdk = 37
         versionCode = 1

@@ -1,0 +1,11 @@
+package io.github.alirezajavan.downpour.internal.data
+
+internal enum class DownloadStatus {
+    QUEUED,
+    RUNNING,
+    PAUSED,
+    COMPLETED,
+    FAILED,
+    CANCELLED,
+    WAITING_FOR_NETWORK,
+}

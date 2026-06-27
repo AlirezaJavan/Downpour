@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.alirezajavan10.downpour"
+    namespace = "io.github.alirezajavan.downpour"
     compileSdk = 37
 
     defaultConfig {
