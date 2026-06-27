@@ -76,25 +76,19 @@ internal class DownloadService : LifecycleService() {
 
     /**
      * Drives the service/notification lifecycle from the actual download states:
-     *  - any RUNNING  -> stay a foreground service, live progress notification.
-     *  - only PAUSED/WAITING -> demote (detach the notification so it survives) and stop the service,
-     *    leaving a persistent, resumable notification. This is what lets you resume from the shade
-     *    after pausing instead of the whole service disappearing.
+     *  - anything ONGOING (running OR paused/waiting) -> stay a live foreground service and keep the
+     *    notification updated. Staying alive while paused is what makes pause/resume/cancel issued
+     *    from the *app UI* show up on the notification: the service keeps observing and refreshes or
+     *    removes it. (The earlier "detach + stopSelf while paused" left the notification orphaned —
+     *    no observer alive — so a later in-app cancel could never clear the paused notification.)
+     *    The paused notification still carries a Resume action, so it stays resumable from the shade.
      *  - nothing ongoing -> remove the notification and stop.
      */
     private fun render(ongoing: List<DownloadItem>) {
-        val anyRunning = ongoing.any { it.state is DownloadState.Running }
         when {
-            anyRunning -> {
-                hasRenderedOngoing = true
-                startForegroundWith(ongoing)
-            }
-
             ongoing.isNotEmpty() -> {
                 hasRenderedOngoing = true
-                graph.notificationManager.notify(NOTIFICATION_ID, graph.notificationFactory.build(ongoing))
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-                stopSelf()
+                startForegroundWith(ongoing)
             }
 
             // Nothing ongoing: stop if we've actually shown work, or if we got here by handling a

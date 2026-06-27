@@ -57,18 +57,10 @@ internal class DownloadNotificationFactory(
         if (items.isEmpty()) return
         if (items.size == SINGLE) {
             val item = items.first()
-            when (item.state) {
-                is DownloadState.Running -> {
-                    builder.addAction(android.R.drawable.ic_media_pause, "Pause", action(DownloadService.ACTION_PAUSE, item.id))
-                }
-
-                is DownloadState.Paused -> {
-                    builder.addAction(android.R.drawable.ic_media_play, "Resume", action(DownloadService.ACTION_RESUME, item.id))
-                }
-
-                else -> {
-                    Unit
-                }
+            if (item.state is DownloadState.Running) {
+                builder.addAction(android.R.drawable.ic_media_pause, "Pause", action(DownloadService.ACTION_PAUSE, item.id))
+            } else if (item.state is DownloadState.Paused) {
+                builder.addAction(android.R.drawable.ic_media_play, "Resume", action(DownloadService.ACTION_RESUME, item.id))
             }
             builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", action(DownloadService.ACTION_CANCEL, item.id))
         } else {
