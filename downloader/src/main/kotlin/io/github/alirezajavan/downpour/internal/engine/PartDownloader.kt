@@ -4,10 +4,14 @@ import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan.downpour.internal.util.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
 import okhttp3.Response
 import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.atomic.AtomicLong
 
 internal class PartDownloader(
@@ -27,7 +31,15 @@ internal class PartDownloader(
                 rangeEnd = resolved.rangeEnd,
                 ifRange = context.ifRange,
             )
-        response.use { writeBody(it, resolved, context) }
+        // Close the response if this coroutine is cancelled, so a blocking socket read (or OkHttp's
+        // own connection-retry loop) unblocks promptly on pause/cancel instead of waiting for a
+        // timeout. dispose() removes the handler on the normal path.
+        val cancelHandle = currentCoroutineContext().job.invokeOnCompletion { runCatching { response.close() } }
+        try {
+            response.use { writeBody(it, resolved, context) }
+        } finally {
+            cancelHandle.dispose()
+        }
     }
 
     private fun resolveRange(part: PartPlan): ResolvedRange {
@@ -75,7 +87,7 @@ internal class PartDownloader(
     }
 
     private suspend fun pump(
-        stream: java.io.InputStream,
+        stream: InputStream,
         startPosition: Long,
         context: PartContext,
     ) {
@@ -103,14 +115,17 @@ internal class PartDownloader(
         context.rateLimiters.forEach { it.acquire(bytes) }
     }
 
-    private fun readChunk(
-        stream: java.io.InputStream,
+    private suspend fun readChunk(
+        stream: InputStream,
         buffer: ByteArray,
     ): Int =
-        try {
-            stream.read(buffer)
-        } catch (io: IOException) {
-            throw DownloadError.Connection(io)
+        withContext(Dispatchers.IO) {
+            try {
+                stream.read(buffer)
+            } catch (io: IOException) {
+                currentCoroutineContext().ensureActive()
+                throw DownloadError.Connection(io)
+            }
         }
 
     private data class ResolvedRange(

@@ -10,6 +10,10 @@ internal data class DownloadEntity(
     val url: String,
     val destinationPath: String,
     val destinationType: Int,
+    // True once the final on-disk destination has been resolved (filename + conflict rename). Guards
+    // against re-resolving — and thus re-renaming ("file(2)(1).bin") — when a task restarts before
+    // any bytes are recorded (e.g. a multi-connection download that preallocated its file).
+    val destinationResolved: Boolean = false,
     val headers: Map<String, String>,
     val metadata: Map<String, String>,
     val tag: String?,

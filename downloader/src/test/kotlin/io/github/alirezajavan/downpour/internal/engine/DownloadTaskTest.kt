@@ -12,6 +12,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -35,6 +36,7 @@ class DownloadTaskTest {
             ioDispatcher = Dispatchers.Unconfined,
             fileStore = fileStore,
             logger = NoOpLogger,
+            destinationMutex = Mutex(),
         )
 
     @Test

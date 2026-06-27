@@ -12,6 +12,7 @@ import io.github.alirezajavan.downpour.internal.engine.AndroidFileStore
 import io.github.alirezajavan.downpour.internal.engine.DownloadEngine
 import io.github.alirezajavan.downpour.internal.engine.DownloadPlanner
 import io.github.alirezajavan.downpour.internal.engine.DownloadTask
+import io.github.alirezajavan.downpour.internal.engine.DownloadTaskRunner
 import io.github.alirezajavan.downpour.internal.engine.PartDownloader
 import io.github.alirezajavan.downpour.internal.engine.RateLimiter
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
@@ -24,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.Inet4Address
@@ -44,7 +46,8 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).fallbackToDestructiveMigration(false)
+            ).addMigrations(DownloadDatabase.MIGRATION_3_4)
+            .fallbackToDestructiveMigration(false)
             .build()
 
     val repository = DownloadRepository(database.downloadDao())
@@ -78,7 +81,11 @@ internal class DownloaderGraph private constructor(
 
     private val networkMonitor = NetworkMonitor(appContext)
 
-    private val taskFactory: () -> DownloadTask = {
+    // Shared by every task instance so destination resolution across concurrent downloads is
+    // serialized (prevents two same-URL downloads from claiming the same file).
+    private val destinationMutex = Mutex()
+
+    private val taskFactory: () -> DownloadTaskRunner = {
         DownloadTask(
             dataSource = dataSource,
             planner = planner,
@@ -89,6 +96,7 @@ internal class DownloaderGraph private constructor(
             ioDispatcher = ioDispatcher,
             fileStore = fileStore,
             logger = logger,
+            destinationMutex = destinationMutex,
         )
     }
 
@@ -141,13 +149,6 @@ internal class DownloaderGraph private constructor(
             }
             return synchronized(this) {
                 instance ?: DownloaderGraph(context, config).also { instance = it }
-            }
-        }
-
-        // Added for testing and debugging to allow fresh start with new config
-        internal fun destroyInstance() {
-            synchronized(this) {
-                instance = null
             }
         }
     }

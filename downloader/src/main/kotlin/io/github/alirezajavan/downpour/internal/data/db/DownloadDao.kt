@@ -51,6 +51,16 @@ internal interface DownloadDao {
         now: Long,
     )
 
+    /** Persists the final destination and marks it resolved so it is never recomputed/renamed. */
+    @Query(
+        "UPDATE downloads SET destinationPath = :path, destinationResolved = 1, updatedAtMillis = :now WHERE id = :id",
+    )
+    suspend fun markDestinationResolved(
+        id: String,
+        path: String,
+        now: Long,
+    )
+
     @Query(
         "UPDATE downloads SET status = :to, updatedAtMillis = :now " +
             "WHERE status IN (:from) AND id NOT IN (:excludeIds)",
@@ -74,6 +84,41 @@ internal interface DownloadDao {
         eta: Long,
         now: Long,
     )
+
+    /**
+     * Progress write that only applies while the row is still RUNNING. Used by the download task so
+     * that a late/in-flight progress flush can never advance a row the engine has already moved to
+     * PAUSED/CANCELLED/COMPLETED (the "Paused at 10% and climbing" bug).
+     */
+    @Query(
+        "UPDATE downloads SET downloadedBytes = :downloaded, totalBytes = :total, " +
+            "bytesPerSecond = :speed, etaMillis = :eta, updatedAtMillis = :now " +
+            "WHERE id = :id AND status = :running",
+    )
+    suspend fun updateProgressIfRunning(
+        id: String,
+        downloaded: Long,
+        total: Long,
+        speed: Long,
+        eta: Long,
+        now: Long,
+        running: DownloadStatus,
+    )
+
+    /**
+     * Number of OTHER downloads (any non-terminal state) already targeting [path]. Lets the task
+     * detect that a concurrent download of the same URL has already claimed a destination, even
+     * before its file exists on disk, so both can be given distinct filenames.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM downloads WHERE destinationPath = :path AND id != :excludeId " +
+            "AND status NOT IN (:terminal)",
+    )
+    suspend fun countOthersUsingDestination(
+        path: String,
+        excludeId: String,
+        terminal: List<DownloadStatus>,
+    ): Int
 
     @Query(
         "UPDATE downloads SET supportsResume = :supportsResume, totalBytes = :total, " +

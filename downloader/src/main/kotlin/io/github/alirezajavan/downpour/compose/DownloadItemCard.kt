@@ -2,7 +2,8 @@ package io.github.alirezajavan.downpour.compose
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -17,6 +18,7 @@ import io.github.alirezajavan.downpour.api.DownloadItem
 import io.github.alirezajavan.downpour.api.DownloadState
 import io.github.alirezajavan.downpour.internal.util.ByteFormatter
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 public fun DownloadItemCard(
     item: DownloadItem,
@@ -48,7 +50,13 @@ public fun DownloadItemCard(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // FlowRow so the action buttons wrap onto the next line on narrow screens instead of
+            // overflowing / clipping the last button.
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Button(onClick = { onPause(item.id) }) { Text("Pause") }
                 Button(onClick = { onResume(item.id) }) { Text("Resume") }
                 Button(onClick = { onCancel(item.id) }) { Text("Cancel") }

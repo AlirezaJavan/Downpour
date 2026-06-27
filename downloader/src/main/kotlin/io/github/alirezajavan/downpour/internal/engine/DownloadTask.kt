@@ -20,6 +20,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
@@ -34,9 +36,12 @@ internal class DownloadTask(
     private val ioDispatcher: CoroutineDispatcher,
     private val fileStore: FileStore,
     private val logger: Logger,
+    // Shared across all task instances: serializes destination resolution so two concurrent
+    // downloads (e.g. the same URL enqueued twice) deterministically claim distinct filenames.
+    private val destinationMutex: Mutex,
     private val clock: () -> Long = System::currentTimeMillis,
-) {
-    suspend fun run(entity: DownloadEntity): TaskResult =
+) : DownloadTaskRunner {
+    override suspend fun run(entity: DownloadEntity): TaskResult =
         withContext(ioDispatcher) {
             runCatchingDownload(entity)
         }
@@ -56,8 +61,7 @@ internal class DownloadTask(
         logger.d("Executing task for ${entity.id}")
         val initialDestination = entity.toDestination()
         val info = probe(entity)
-        val resolvedDestination = resolveDestination(entity, initialDestination, info)
-        val currentDestination = handleConflict(entity, resolvedDestination)
+        val currentDestination = resolveFinalDestination(entity, initialDestination, info)
         val currentEntity =
             if (currentDestination != initialDestination) {
                 entity.copy(
@@ -82,66 +86,76 @@ internal class DownloadTask(
         return TaskResult.Completed(total)
     }
 
-    private suspend fun resolveDestination(
+    /**
+     * Resolves the final on-disk destination and persists it, atomically across concurrent tasks.
+     *
+     * Held under [destinationMutex] so two downloads racing for the same path (the classic "same URL
+     * enqueued twice" case) are serialized: each one sees the other's already-claimed path — via the
+     * DB ([DownloadRepository.isDestinationClaimedByOther]) even before any file exists on disk — and
+     * the RENAME strategy gives them distinct names ("file", "file (1)", …). The chosen path is
+     * written back to the row immediately so it becomes the claim the next task observes.
+     */
+    private suspend fun resolveFinalDestination(
         entity: DownloadEntity,
         destination: DownloadDestination,
         info: RemoteFileInfo,
     ): DownloadDestination {
-        if (entity.downloadedBytes > 0) return destination
-        if (destination is DownloadDestination.File) {
-            val file = File(destination.path)
-            if (file.isDirectory || !file.name.contains('.')) {
-                val resolvedName = FilenameResolver.resolve(entity.url, info)
-                val newFile =
-                    if (file.isDirectory) {
-                        File(file, resolvedName)
-                    } else {
-                        File(file.parentFile, resolvedName)
-                    }
-                if (newFile.absolutePath != destination.path) {
-                    repository.setDestinationPath(entity.id, newFile.absolutePath)
-                    return DownloadDestination.File(newFile.absolutePath)
-                }
-            }
+        // Already finalized on a previous run (resuming, or restarted before any bytes): keep it.
+        // Without this guard a restart would see its own preallocated file and rename again.
+        if (entity.destinationResolved || entity.downloadedBytes > 0) return destination
+        if (destination !is DownloadDestination.File) return destination
+
+        return destinationMutex.withLock {
+            val named = applyResolvedFilename(entity, destination, info)
+            claimDestination(entity, named)
         }
-        return destination
     }
 
-    private suspend fun handleConflict(
+    /** Expands a directory / extension-less target into a concrete filename (no DB write). */
+    private fun applyResolvedFilename(
         entity: DownloadEntity,
-        destination: DownloadDestination,
-    ): DownloadDestination {
-        if (entity.downloadedBytes > 0) return destination
-        if (destination is DownloadDestination.File) {
-            val file = File(destination.path)
-            if (file.exists()) {
-                return when (ConflictStrategy.entries[entity.conflictStrategy]) {
-                    ConflictStrategy.OVERWRITE -> {
-                        destination
-                    }
-
-                    ConflictStrategy.FAIL -> {
-                        throw DownloadError.FileAlreadyExists(file.absolutePath)
-                    }
-
-                    ConflictStrategy.RENAME -> {
-                        val uniqueFile = generateUniqueFile(file)
-                        repository.setDestinationPath(entity.id, uniqueFile.absolutePath)
-                        DownloadDestination.File(uniqueFile.absolutePath)
-                    }
-                }
-            }
-        }
-        return destination
+        destination: DownloadDestination.File,
+        info: RemoteFileInfo,
+    ): DownloadDestination.File {
+        val file = File(destination.path)
+        if (!file.isDirectory && file.name.contains('.')) return destination
+        val resolvedName = FilenameResolver.resolve(entity.url, info)
+        val newFile = if (file.isDirectory) File(file, resolvedName) else File(file.parentFile, resolvedName)
+        return DownloadDestination.File(newFile.absolutePath)
     }
 
-    private fun generateUniqueFile(file: File): File {
+    private suspend fun claimDestination(
+        entity: DownloadEntity,
+        destination: DownloadDestination.File,
+    ): DownloadDestination {
+        val file = File(destination.path)
+        val taken = file.exists() || repository.isDestinationClaimedByOther(destination.path, entity.id)
+        val finalDestination =
+            if (!taken) {
+                destination
+            } else {
+                when (ConflictStrategy.entries[entity.conflictStrategy]) {
+                    ConflictStrategy.OVERWRITE -> destination
+                    ConflictStrategy.FAIL -> throw DownloadError.FileAlreadyExists(file.absolutePath)
+                    ConflictStrategy.RENAME -> DownloadDestination.File(generateUniqueFile(entity, file).absolutePath)
+                }
+            }
+        // Persist the resolved path AND mark it resolved, so it becomes this row's claim for any
+        // concurrent resolver and is never recomputed (and thus never re-renamed) on a restart.
+        repository.markDestinationResolved(entity.id, finalDestination.path)
+        return finalDestination
+    }
+
+    private suspend fun generateUniqueFile(
+        entity: DownloadEntity,
+        file: File,
+    ): File {
         val parent = file.parentFile
         val name = file.nameWithoutExtension
         val extension = file.extension
         var count = 1
         var uniqueFile = file
-        while (uniqueFile.exists()) {
+        while (uniqueFile.exists() || repository.isDestinationClaimedByOther(uniqueFile.absolutePath, entity.id)) {
             val suffix = "($count)"
             val newName = if (extension.isEmpty()) "$name$suffix" else "$name$suffix.$extension"
             uniqueFile = File(parent, newName)
@@ -248,7 +262,9 @@ internal class DownloadTask(
                 repository.setPartOffset(partId, offset.get())
             }
         }
-        repository.setProgress(
+        // Gated on RUNNING: once the engine has paused/cancelled/completed the row this is a no-op,
+        // so a late or in-flight flush can never make a paused download's progress keep climbing.
+        repository.setRunningProgress(
             id = transfer.entity.id,
             downloaded = transfer.progress.get(),
             total = transfer.plan.totalBytes,

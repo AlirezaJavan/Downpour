@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test
 class DownloadEngineTest {
     private val testScope = TestScope()
     private val repository = mockk<DownloadRepository>(relaxed = true)
-    private val taskFactory = mockk<() -> DownloadTask>()
+    private val taskFactory = mockk<() -> DownloadTaskRunner>()
     private val config = DownloadManagerConfig()
     private val serviceController = mockk<DownloadServiceController>(relaxed = true)
     private val networkMonitor = mockk<NetworkMonitor>(relaxed = true)
