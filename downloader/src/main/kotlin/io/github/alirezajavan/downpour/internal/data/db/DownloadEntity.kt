@@ -8,15 +8,24 @@ import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 internal data class DownloadEntity(
     @PrimaryKey val id: String,
     val url: String,
+    val mirrors: List<String> = emptyList(),
     val destinationPath: String,
     val destinationType: Int,
+    // True once the final on-disk destination has been resolved (filename + conflict rename). Guards
+    // against re-resolving — and thus re-renaming ("file(2)(1).bin") — when a task restarts before
+    // any bytes are recorded (e.g. a multi-connection download that preallocated its file).
+    val destinationResolved: Boolean = false,
     val headers: Map<String, String>,
     val metadata: Map<String, String>,
     val tag: String?,
     val workerClass: String?,
     val priority: Int,
+    val sortKey: Long = 0,
     val conflictStrategy: Int,
     val networkType: Int,
+    val requiresCharging: Boolean = false,
+    val requiresBatteryNotLow: Boolean = false,
+    val requiresStorageNotLow: Boolean = false,
     val maxConnections: Int,
     val maxBytesPerSecond: Long,
     val checksumAlgorithm: Int?,

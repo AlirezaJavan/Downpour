@@ -6,24 +6,29 @@ import androidx.room.Room
 import io.github.alirezajavan.downpour.api.DownloadManager
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.internal.DefaultDownloadManager
+import io.github.alirezajavan.downpour.internal.DownloadEventDispatcher
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.db.DownloadDatabase
+import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.engine.AndroidFileStore
 import io.github.alirezajavan.downpour.internal.engine.DownloadEngine
 import io.github.alirezajavan.downpour.internal.engine.DownloadPlanner
 import io.github.alirezajavan.downpour.internal.engine.DownloadTask
+import io.github.alirezajavan.downpour.internal.engine.DownloadTaskRunner
 import io.github.alirezajavan.downpour.internal.engine.PartDownloader
 import io.github.alirezajavan.downpour.internal.engine.RateLimiter
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
+import io.github.alirezajavan.downpour.internal.service.CompletionNotificationListener
 import io.github.alirezajavan.downpour.internal.service.DownloadNotificationFactory
 import io.github.alirezajavan.downpour.internal.service.ForegroundServiceController
 import io.github.alirezajavan.downpour.internal.util.AndroidLogger
+import io.github.alirezajavan.downpour.internal.util.DownloadLoggerAdapter
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import java.net.Inet4Address
@@ -34,9 +39,10 @@ internal class DownloaderGraph private constructor(
     config: DownloadManagerConfig,
 ) {
     private val appContext = context.applicationContext
-    private val ioDispatcher = Dispatchers.IO
+    private val ioDispatcher = config.ioDispatcher
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
-    private val logger: Logger = AndroidLogger(config.verbose)
+    private val logger: Logger =
+        config.logger?.let { DownloadLoggerAdapter(it) } ?: AndroidLogger(config.verbose)
 
     private val database =
         Room
@@ -44,7 +50,8 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).fallbackToDestructiveMigration(false)
+            ).addMigrations(DownloadDatabase.MIGRATION_3_4, DownloadDatabase.MIGRATION_4_5)
+            .fallbackToDestructiveMigration(false)
             .build()
 
     val repository = DownloadRepository(database.downloadDao())
@@ -56,13 +63,15 @@ internal class DownloaderGraph private constructor(
                 if (config.preferIpv4) {
                     dns(IPv4OnlyDns)
                 }
+                config.proxy?.let { proxy(it) }
+                config.cookieJar?.let { cookieJar(it) }
             }.connectTimeout(config.connectTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .readTimeout(config.readTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .retryOnConnectionFailure(true)
             .fastFallback(true)
             .build()
 
-    private val dataSource = HttpDownloadDataSource(httpClient, ioDispatcher, logger)
+    private val dataSource = HttpDownloadDataSource(httpClient, ioDispatcher, logger, config.headerProvider)
     private val fileStore = AndroidFileStore(appContext)
     private val planner = DownloadPlanner(repository, config)
     private val partDownloader = PartDownloader(dataSource, fileStore, logger)
@@ -78,7 +87,13 @@ internal class DownloaderGraph private constructor(
 
     private val networkMonitor = NetworkMonitor(appContext)
 
-    private val taskFactory: () -> DownloadTask = {
+    private val deviceStateMonitor = DeviceStateMonitor(appContext)
+
+    // Shared by every task instance so destination resolution across concurrent downloads is
+    // serialized (prevents two same-URL downloads from claiming the same file).
+    private val destinationMutex = Mutex()
+
+    private val taskFactory: () -> DownloadTaskRunner = {
         DownloadTask(
             dataSource = dataSource,
             planner = planner,
@@ -89,6 +104,7 @@ internal class DownloaderGraph private constructor(
             ioDispatcher = ioDispatcher,
             fileStore = fileStore,
             logger = logger,
+            destinationMutex = destinationMutex,
         )
     }
 
@@ -100,9 +116,17 @@ internal class DownloaderGraph private constructor(
             config = config,
             serviceController = serviceController,
             networkMonitor = networkMonitor,
+            deviceStateMonitor = deviceStateMonitor,
             fileStore = fileStore,
             logger = logger,
         )
+
+    private val eventDispatcher =
+        DownloadEventDispatcher(scope, repository, config.listeners).apply {
+            if (config.notification.enabled && config.notification.showCompletionNotification) {
+                add(CompletionNotificationListener(notificationManager, notificationFactory))
+            }
+        }
 
     val downloadManager: DownloadManager =
         DefaultDownloadManager(
@@ -111,6 +135,7 @@ internal class DownloaderGraph private constructor(
             scope = scope,
             config = config,
             logger = logger,
+            eventDispatcher = eventDispatcher,
         )
 
     init {
@@ -141,13 +166,6 @@ internal class DownloaderGraph private constructor(
             }
             return synchronized(this) {
                 instance ?: DownloaderGraph(context, config).also { instance = it }
-            }
-        }
-
-        // Added for testing and debugging to allow fresh start with new config
-        internal fun destroyInstance() {
-            synchronized(this) {
-                instance = null
             }
         }
     }

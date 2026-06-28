@@ -1,6 +1,10 @@
 package io.github.alirezajavan.downpour.api
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import okhttp3.CookieJar
 import okhttp3.OkHttpClient
+import java.net.Proxy
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -19,6 +23,15 @@ public data class DownloadManagerConfig(
     val notification: NotificationConfig = NotificationConfig(),
     val verbose: Boolean = false,
     val preferIpv4: Boolean = false,
+    val filenameResolver: FilenameResolver = FilenameResolver.Default,
+    val logger: DownloadLogger? = null,
+    val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    val postProcessors: List<DownloadPostProcessor> = emptyList(),
+    val headerProvider: HeaderProvider? = null,
+    val listeners: List<DownloadListener> = emptyList(),
+    val expireCompletedAfter: Duration? = null,
+    val proxy: Proxy? = null,
+    val cookieJar: CookieJar? = null,
 ) {
     init {
         require(maxConcurrentDownloads >= 1) { "maxConcurrentDownloads must be >= 1" }

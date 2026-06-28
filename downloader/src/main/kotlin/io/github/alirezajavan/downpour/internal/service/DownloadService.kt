@@ -8,13 +8,23 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import io.github.alirezajavan.downpour.api.DownloadItem
+import io.github.alirezajavan.downpour.api.DownloadState
 import io.github.alirezajavan.downpour.internal.di.DownloaderGraph
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 internal class DownloadService : LifecycleService() {
     private val graph by lazy { DownloaderGraph.getInstance(applicationContext) }
     private var isObserving = false
+    private var hasRenderedOngoing = false
+
+    /**
+     * True once this instance has dispatched an explicit user action (pause/resume/cancel from the
+     * notification). When set, an emptied "ongoing" list is a real "everything is gone, stop now"
+     * signal rather than the startup race we otherwise ignore.
+     */
+    private var dispatchedUserAction = false
 
     override fun onStartCommand(
         intent: Intent?,
@@ -22,52 +32,79 @@ internal class DownloadService : LifecycleService() {
         startId: Int,
     ): Int {
         super.onStartCommand(intent, flags, startId)
-        val action = intent?.action
-        if (action == ACTION_STOP) {
-            stopForegroundAndSelf()
+        // Always promote to foreground within the system grace window, BEFORE anything that suspends.
+        startForegroundPlaceholder()
+
+        if (intent?.action == ACTION_STOP) {
+            removeAndStop()
             return START_NOT_STICKY
         }
-        handleAction(intent)
-        startForegroundWith(emptyList())
-        observeDownloads()
+        lifecycleScope.launch {
+            // Await the action FIRST so the lifecycle observer's initial emission reflects the
+            // resolved state. Otherwise a notification action that spawns a fresh instance (the
+            // service stops itself while only paused) would render the stale pre-action state and
+            // stopSelf() before the action even completes.
+            dispatchAction(intent)
+            observeDownloads()
+        }
         return START_NOT_STICKY
     }
 
-    private fun handleAction(intent: Intent?) {
+    private suspend fun dispatchAction(intent: Intent?) {
         val action = intent?.action ?: return
         val id = intent.getStringExtra(EXTRA_ID)
-        lifecycleScope.launch {
-            when (action) {
-                ACTION_PAUSE -> id?.let { graph.downloadManager.pause(it) }
-                ACTION_CANCEL -> id?.let { graph.downloadManager.cancel(it) }
-                ACTION_PAUSE_ALL -> graph.downloadManager.pauseAll()
-                ACTION_CANCEL_ALL -> graph.downloadManager.cancelAll()
+        dispatchedUserAction = true
+        when (action) {
+            ACTION_PAUSE -> id?.let { graph.downloadManager.pause(it) }
+            ACTION_RESUME -> id?.let { graph.downloadManager.resume(it) }
+            ACTION_CANCEL -> id?.let { graph.downloadManager.cancel(it) }
+            ACTION_PAUSE_ALL -> graph.downloadManager.pauseAll()
+            ACTION_RESUME_ALL -> graph.downloadManager.resumeAll()
+            ACTION_CANCEL_ALL -> graph.downloadManager.cancelAll()
+        }
+    }
+
+    private suspend fun observeDownloads() {
+        if (isObserving) return
+        isObserving = true
+        graph.repository
+            .observeAllItems()
+            .map { items -> items.filter { it.state.isOngoing } }
+            .distinctUntilChanged()
+            .collect { render(it) }
+    }
+
+    /**
+     * Drives the service/notification lifecycle from the actual download states:
+     *  - anything ONGOING (running OR paused/waiting) -> stay a live foreground service and keep the
+     *    notification updated. Staying alive while paused is what makes pause/resume/cancel issued
+     *    from the *app UI* show up on the notification: the service keeps observing and refreshes or
+     *    removes it. (The earlier "detach + stopSelf while paused" left the notification orphaned —
+     *    no observer alive — so a later in-app cancel could never clear the paused notification.)
+     *    The paused notification still carries a Resume action, so it stays resumable from the shade.
+     *  - nothing ongoing -> remove the notification and stop.
+     */
+    private fun render(ongoing: List<DownloadItem>) {
+        when {
+            ongoing.isNotEmpty() -> {
+                hasRenderedOngoing = true
+                startForegroundWith(ongoing)
+            }
+
+            // Nothing ongoing: stop if we've actually shown work, or if we got here by handling a
+            // user action (e.g. Cancel all) that legitimately emptied the list. Otherwise this is
+            // the initial empty emission before any state has appeared (startup race) — ignore it.
+            hasRenderedOngoing || dispatchedUserAction -> {
+                removeAndStop()
             }
         }
     }
 
-    private fun observeDownloads() {
-        if (isObserving) return
-        isObserving = true
-        lifecycleScope.launch {
-            graph.repository
-                .observeAllItems()
-                .distinctUntilChanged()
-                .collect { items -> onItemsChanged(items.filter { it.state.isActive }) }
-        }
-    }
+    private fun startForegroundPlaceholder() = startForegroundWith(emptyList())
 
-    private fun onItemsChanged(active: List<DownloadItem>) {
-        if (active.isEmpty()) {
-            stopForegroundAndSelf()
-        } else {
-            graph.notificationManager.notify(NOTIFICATION_ID, graph.notificationFactory.build(active))
-        }
-    }
-
-    private fun startForegroundWith(active: List<DownloadItem>) {
+    private fun startForegroundWith(ongoing: List<DownloadItem>) {
         graph.notificationFactory.ensureChannel()
-        val notification = graph.notificationFactory.build(active)
+        val notification = graph.notificationFactory.build(ongoing)
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, foregroundType())
     }
 
@@ -78,7 +115,7 @@ internal class DownloadService : LifecycleService() {
             0
         }
 
-    private fun stopForegroundAndSelf() {
+    private fun removeAndStop() {
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -87,23 +124,37 @@ internal class DownloadService : LifecycleService() {
         private const val NOTIFICATION_ID = 0x44504D
         const val ACTION_STOP = "io.github.alirezajavan.downpour.action.STOP"
         const val ACTION_PAUSE = "io.github.alirezajavan.downpour.action.PAUSE"
+        const val ACTION_RESUME = "io.github.alirezajavan.downpour.action.RESUME"
         const val ACTION_CANCEL = "io.github.alirezajavan.downpour.action.CANCEL"
         const val ACTION_PAUSE_ALL = "io.github.alirezajavan.downpour.action.PAUSE_ALL"
+        const val ACTION_RESUME_ALL = "io.github.alirezajavan.downpour.action.RESUME_ALL"
         const val ACTION_CANCEL_ALL = "io.github.alirezajavan.downpour.action.CANCEL_ALL"
         const val EXTRA_ID = "io.github.alirezajavan.downpour.extra.ID"
 
+        /** States worth keeping a notification up for. */
+        private val DownloadState.isOngoing: Boolean
+            get() =
+                this is DownloadState.Running ||
+                    this is DownloadState.Paused ||
+                    this is DownloadState.WaitingForNetwork
+
         fun start(context: Context) {
-            val intent = Intent(context, DownloadService::class.java)
+            startServiceCompat(context, Intent(context, DownloadService::class.java))
+        }
+
+        fun stop(context: Context) {
+            startServiceCompat(context, Intent(context, DownloadService::class.java).setAction(ACTION_STOP))
+        }
+
+        private fun startServiceCompat(
+            context: Context,
+            intent: Intent,
+        ) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
-        }
-
-        fun stop(context: Context) {
-            val intent = Intent(context, DownloadService::class.java).setAction(ACTION_STOP)
-            context.startService(intent)
         }
     }
 }

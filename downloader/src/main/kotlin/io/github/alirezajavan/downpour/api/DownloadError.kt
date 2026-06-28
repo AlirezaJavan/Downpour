@@ -45,9 +45,9 @@ public sealed class DownloadError(
     public val isRetryable: Boolean
         get() =
             when (this) {
-                is Connection, is Timeout, is Unknown -> true
+                is Connection, is Timeout, is Unknown, is InsufficientStorage -> true
                 is Http -> statusCode == TOO_MANY_REQUESTS || statusCode >= INTERNAL_SERVER_ERROR
-                is InsufficientStorage, is Storage, is ContentValidation, is FileAlreadyExists -> false
+                is Storage, is ContentValidation, is FileAlreadyExists -> false
             }
 
     private companion object {

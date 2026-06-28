@@ -13,6 +13,12 @@ internal class Converters {
     fun toStringMap(value: String): Map<String, String> = if (value.isEmpty()) emptyMap() else json.decodeFromString(value)
 
     @TypeConverter
+    fun fromStringList(value: List<String>): String = json.encodeToString(value)
+
+    @TypeConverter
+    fun toStringList(value: String): List<String> = if (value.isEmpty()) emptyList() else json.decodeFromString(value)
+
+    @TypeConverter
     fun fromStatus(status: DownloadStatus): Int = status.ordinal
 
     @TypeConverter

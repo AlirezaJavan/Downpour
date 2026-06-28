@@ -60,6 +60,36 @@ class DownloadRepositoryTest {
             assertThat(result.map { it.id }).containsExactly("id1", "id2")
         }
 
+    @Test
+    fun `setRunningProgress only applies while the row is running`() =
+        runTest {
+            repository.insert(createMockEntity("id1").copy(status = DownloadStatus.RUNNING))
+
+            repository.setRunningProgress("id1", downloaded = 50, total = 100, speed = 0, eta = 0)
+            assertThat(repository.getEntity("id1")!!.downloadedBytes).isEqualTo(50)
+
+            // Once paused, further progress writes from a lagging task must be ignored.
+            repository.setStatus("id1", DownloadStatus.PAUSED)
+            repository.setRunningProgress("id1", downloaded = 90, total = 100, speed = 0, eta = 0)
+
+            assertThat(repository.getEntity("id1")!!.downloadedBytes).isEqualTo(50)
+        }
+
+    @Test
+    fun `isDestinationClaimedByOther detects other non-terminal rows on the same path`() =
+        runTest {
+            repository.insert(createMockEntity("a").copy(destinationPath = "/d/file.bin", status = DownloadStatus.RUNNING))
+
+            // Another download targeting the same path is detected (would trigger a rename).
+            assertThat(repository.isDestinationClaimedByOther("/d/file.bin", excludeId = "b")).isTrue()
+            // The owner itself is excluded.
+            assertThat(repository.isDestinationClaimedByOther("/d/file.bin", excludeId = "a")).isFalse()
+
+            // A terminal (completed) row no longer claims the path.
+            repository.setStatus("a", DownloadStatus.COMPLETED)
+            assertThat(repository.isDestinationClaimedByOther("/d/file.bin", excludeId = "b")).isFalse()
+        }
+
     private fun createMockEntity(id: String) =
         DownloadEntity(
             id = id,

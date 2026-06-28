@@ -5,6 +5,15 @@ import kotlinx.coroutines.flow.Flow
 public interface DownloadManager {
     public fun enqueue(request: DownloadRequest): String
 
+    public fun enqueueAll(requests: List<DownloadRequest>): List<String>
+
+    public suspend fun setPriority(
+        id: String,
+        priority: Priority,
+    )
+
+    public suspend fun moveToFront(id: String)
+
     public suspend fun pause(id: String)
 
     public suspend fun resume(id: String)
@@ -41,7 +50,17 @@ public interface DownloadManager {
 
     public suspend fun getAll(): List<DownloadItem>
 
+    public suspend fun getByTag(tag: String): List<DownloadItem>
+
     public fun observe(id: String): Flow<DownloadItem?>
 
     public fun observeAll(): Flow<List<DownloadItem>>
+
+    public fun observeByTag(tag: String): Flow<List<DownloadItem>>
+
+    public fun observeGroupProgress(tag: String): Flow<GroupProgress>
+
+    public fun addListener(listener: DownloadListener)
+
+    public fun removeListener(listener: DownloadListener)
 }

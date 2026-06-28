@@ -2,6 +2,7 @@ package io.github.alirezajavan.downpour.internal.network
 
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadProgress
+import io.github.alirezajavan.downpour.api.HeaderProvider
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -16,6 +17,7 @@ internal class HttpDownloadDataSource(
     private val client: OkHttpClient,
     private val ioDispatcher: CoroutineDispatcher,
     private val logger: Logger,
+    private val headerProvider: HeaderProvider? = null,
 ) {
     suspend fun probe(
         url: String,
@@ -103,13 +105,20 @@ internal class HttpDownloadDataSource(
         Request
             .Builder()
             .url(url)
-            .headers(headers.toHeaders())
+            .headers(effectiveHeaders(url, headers).toHeaders())
             .apply {
                 if (!headers.containsKey(HEADER_USER_AGENT)) {
                     header(HEADER_USER_AGENT, DEFAULT_USER_AGENT)
                 }
             }.apply(block)
             .build()
+
+    // Provider headers overlay the per-request ones so a fresh value (e.g. a refreshed auth token)
+    // wins on every attempt, including resumes after the original token expired.
+    private fun effectiveHeaders(
+        url: String,
+        headers: Map<String, String>,
+    ): Map<String, String> = headerProvider?.let { headers + it.headers(url) } ?: headers
 
     private fun parseFileInfo(response: Response): RemoteFileInfo {
         val etag = response.header(HEADER_ETAG)

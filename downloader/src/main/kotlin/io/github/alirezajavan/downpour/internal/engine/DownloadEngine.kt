@@ -7,9 +7,12 @@ import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.device.DeviceState
+import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
@@ -23,14 +26,28 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class DownloadEngine(
     private val scope: CoroutineScope,
     private val repository: DownloadRepository,
-    private val taskFactory: () -> DownloadTask,
+    private val taskFactory: () -> DownloadTaskRunner,
     private val config: DownloadManagerConfig,
     private val serviceController: DownloadServiceController,
     private val networkMonitor: NetworkMonitor,
+    private val deviceStateMonitor: DeviceStateMonitor,
     private val fileStore: FileStore,
     private val logger: Logger,
 ) {
     private val activeJobs = ConcurrentHashMap<String, Job>()
+    private val retryJobs = ConcurrentHashMap<String, Job>()
+
+    /**
+     * Serializes every state transition. All status writes plus (de)registration of running jobs
+     * and retry timers happen under this lock, so the user-facing operations (pause/resume/cancel/
+     * retry/remove and their bulk/tag variants) can never interleave with the scheduler's
+     * [start]/[schedule]. This is what makes "I paused but it kept downloading" impossible: a pause
+     * either runs fully before a start (and the start then sees the row is no longer eligible) or
+     * fully after it (and it finds the job in [activeJobs] and cancels it).
+     *
+     * The mutex is NOT reentrant. Helpers that mutate state assume the lock is already held; public
+     * entry points take the lock for their critical section, release it, then call [schedule].
+     */
     private val scheduleMutex = Mutex()
     private val networkWatchStarted = AtomicBoolean(false)
     private val isRecovered = AtomicBoolean(false)
@@ -41,6 +58,7 @@ internal class DownloadEngine(
         scheduleMutex.withLock {
             logger.d("Recovering leaked downloads...")
             startNetworkWatch()
+            config.expireCompletedAfter?.let { repository.deleteExpiredCompleted(it.inWholeMilliseconds) }
             val activeIds = activeJobs.keys.toList()
             repository.setStatusIn(
                 from = listOf(DownloadStatus.RUNNING, DownloadStatus.WAITING_FOR_NETWORK),
@@ -54,6 +72,7 @@ internal class DownloadEngine(
     private fun startNetworkWatch() {
         if (!networkWatchStarted.compareAndSet(false, true)) return
         scope.launch { networkMonitor.changes.drop(1).collect { schedule() } }
+        scope.launch { deviceStateMonitor.changes.drop(1).collect { schedule() } }
     }
 
     fun onEnqueued() {
@@ -61,37 +80,52 @@ internal class DownloadEngine(
     }
 
     suspend fun pause(id: String) {
-        if (activeJobs.containsKey(id)) {
+        scheduleMutex.withLock {
+            cancelRetry(id)
             repository.setStatus(id, DownloadStatus.PAUSED)
             cancelJob(id)
-        } else {
-            repository.setStatus(id, DownloadStatus.PAUSED)
         }
+        schedule()
     }
 
     suspend fun resume(id: String) {
         logger.d("Resuming download: $id")
-        repository.setStatus(id, DownloadStatus.QUEUED)
+        scheduleMutex.withLock {
+            cancelRetry(id)
+            repository.setStatus(id, DownloadStatus.QUEUED)
+        }
         schedule()
     }
 
     suspend fun pauseByTag(tag: String) {
-        val entities = repository.getByTag(tag)
-        repository.setStatusByTag(tag, ACTIVE_STATUSES, DownloadStatus.PAUSED)
-        entities.forEach { cancelJob(it.id) }
+        scheduleMutex.withLock {
+            val entities = repository.getByTag(tag)
+            repository.setStatusByTag(tag, ACTIVE_STATUSES, DownloadStatus.PAUSED)
+            entities.forEach {
+                cancelRetry(it.id)
+                cancelJob(it.id)
+            }
+        }
+        schedule()
     }
 
     suspend fun resumeByTag(tag: String) {
-        repository.setStatusByTag(tag, listOf(DownloadStatus.PAUSED), DownloadStatus.QUEUED)
+        scheduleMutex.withLock {
+            repository.getByTag(tag).forEach { cancelRetry(it.id) }
+            repository.setStatusByTag(tag, listOf(DownloadStatus.PAUSED), DownloadStatus.QUEUED)
+        }
         schedule()
     }
 
     suspend fun cancelByTag(tag: String) {
-        val entities = repository.getByTag(tag)
-        repository.setStatusByTag(tag, INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
-        entities.forEach { entity ->
-            cancelJob(entity.id)
-            discardArtifacts(entity)
+        scheduleMutex.withLock {
+            val entities = repository.getByTag(tag)
+            repository.setStatusByTag(tag, INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
+            entities.forEach { entity ->
+                cancelRetry(entity.id)
+                cancelJob(entity.id)
+                discardArtifacts(entity)
+            }
         }
         schedule()
     }
@@ -100,64 +134,120 @@ internal class DownloadEngine(
         tag: String,
         deleteFiles: Boolean,
     ) {
-        val entities = repository.getByTag(tag)
-        entities.forEach { entity ->
-            cancelJob(entity.id)
-            if (deleteFiles) fileStore.delete(entity.toDestination())
+        scheduleMutex.withLock {
+            val entities = repository.getByTag(tag)
+            entities.forEach { entity ->
+                cancelRetry(entity.id)
+                cancelJob(entity.id)
+                if (deleteFiles) fileStore.delete(entity.toDestination())
+            }
+            repository.deleteByTag(tag)
         }
-        repository.deleteByTag(tag)
         schedule()
     }
 
     suspend fun retry(id: String) {
-        repository.setStatus(id, DownloadStatus.QUEUED)
+        scheduleMutex.withLock {
+            cancelRetry(id)
+            repository.setStatus(id, DownloadStatus.QUEUED)
+        }
+        schedule()
+    }
+
+    suspend fun setPriority(
+        id: String,
+        priority: Int,
+    ) {
+        scheduleMutex.withLock { repository.setPriority(id, priority) }
+        schedule()
+    }
+
+    suspend fun moveToFront(id: String) {
+        scheduleMutex.withLock { repository.moveToFront(id) }
         schedule()
     }
 
     suspend fun cancel(id: String) {
-        val entity = repository.getEntity(id) ?: return
-        repository.setStatus(id, DownloadStatus.CANCELLED)
-        cancelJob(id)
-        discardArtifacts(entity)
+        scheduleMutex.withLock {
+            val entity = repository.getEntity(id) ?: return@withLock
+            cancelRetry(id)
+            repository.setStatus(id, DownloadStatus.CANCELLED)
+            cancelJob(id)
+            discardArtifacts(entity)
+        }
         schedule()
     }
 
     suspend fun pauseAll() {
-        repository.setStatusIn(ACTIVE_STATUSES, DownloadStatus.PAUSED)
-        cancelActiveJobs()
+        scheduleMutex.withLock {
+            cancelAllRetries()
+            repository.setStatusIn(ACTIVE_STATUSES, DownloadStatus.PAUSED)
+            cancelActiveJobs()
+        }
+        schedule()
     }
 
     suspend fun resumeAll() {
-        repository.setStatusIn(listOf(DownloadStatus.PAUSED), DownloadStatus.QUEUED)
+        scheduleMutex.withLock {
+            cancelAllRetries()
+            repository.setStatusIn(listOf(DownloadStatus.PAUSED), DownloadStatus.QUEUED)
+        }
         schedule()
     }
 
     suspend fun cancelAll() {
-        repository.setStatusIn(INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
-        cancelActiveJobs()
+        scheduleMutex.withLock {
+            cancelAllRetries()
+            // Snapshot the rows about to be cancelled so their on-disk artifacts can be discarded.
+            val affected = repository.entitiesByStatuses(INTERRUPTIBLE_STATUSES)
+            repository.setStatusIn(INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
+            cancelActiveJobs()
+            affected.forEach { discardArtifacts(it) }
+        }
         schedule()
-    }
-
-    private suspend fun cancelActiveJobs() {
-        activeJobs.keys.toList().forEach { cancelJob(it) }
     }
 
     suspend fun remove(
         id: String,
         deleteFile: Boolean,
     ) {
-        cancelJob(id)
-        val entity = repository.getEntity(id)
-        if (deleteFile) entity?.let { fileStore.delete(it.toDestination()) }
-        repository.delete(id)
+        scheduleMutex.withLock {
+            cancelRetry(id)
+            cancelJob(id)
+            val entity = repository.getEntity(id)
+            if (deleteFile) entity?.let { fileStore.delete(it.toDestination()) }
+            repository.delete(id)
+        }
         schedule()
     }
 
-    private suspend fun cancelJob(id: String) {
-        activeJobs.remove(id)?.let { job ->
-            job.cancel()
-            job.join() // Wait for task to finish so it doesn't overwrite DB during cleanup
-        }
+    private fun cancelActiveJobs() {
+        activeJobs.keys.toList().forEach { cancelJob(it) }
+    }
+
+    /**
+     * Cancels the running job for [id]. Must hold [scheduleMutex].
+     *
+     * Deliberately does NOT join the job. Joining here would deadlock — the task's completion path
+     * ([onCompleted]/[onFailed]) re-acquires [scheduleMutex] — and would also stall every pause on
+     * the in-flight socket read. Correctness instead comes from two guarantees that hold regardless
+     * of when the cancelled task finally unwinds:
+     *  1. The caller has already written the new status (PAUSED/CANCELLED) under this lock, and the
+     *     task only writes progress via [DownloadRepository.setRunningProgress], a no-op once the row
+     *     is not RUNNING — so it can never advance a paused/cancelled row.
+     *  2. [onCompleted]/[onFailed] re-check the row is still RUNNING before doing anything, so a task
+     *     that finishes just after cancellation cannot resurrect a terminal state.
+     */
+    private fun cancelJob(id: String) {
+        activeJobs.remove(id)?.cancel()
+    }
+
+    private fun cancelRetry(id: String) {
+        retryJobs.remove(id)?.cancel()
+    }
+
+    private fun cancelAllRetries() {
+        retryJobs.keys.toList().forEach { cancelRetry(it) }
     }
 
     private suspend fun discardArtifacts(entity: DownloadEntity) {
@@ -182,12 +272,19 @@ internal class DownloadEngine(
     private suspend fun schedule() =
         scheduleMutex.withLock {
             val status = networkMonitor.snapshot()
-            logger.d("Scheduling downloads. Network status: $status")
+            val device = deviceStateMonitor.snapshot()
+            logger.d("Scheduling downloads. Network status: $status, Device status: $device")
 
             activeJobs.forEach { (id, _) ->
                 val entity = repository.getEntity(id) ?: return@forEach
-                if (!status.satisfies(NetworkType.entries[entity.networkType])) {
+                val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
+                val deviceSatisfied = device.satisfiesConstraints(entity)
+
+                if (!networkSatisfied) {
                     repository.setStatus(id, DownloadStatus.WAITING_FOR_NETWORK)
+                    cancelJob(id)
+                } else if (!deviceSatisfied) {
+                    repository.setStatus(id, DownloadStatus.QUEUED)
                     cancelJob(id)
                 }
             }
@@ -199,21 +296,36 @@ internal class DownloadEngine(
 
     private suspend fun startEligible(slots: Int) {
         val status = networkMonitor.snapshot()
+        val device = deviceStateMonitor.snapshot()
         repository
             .nextQueued(QUEUE_SCAN_LIMIT)
             .asSequence()
             .filterNot { activeJobs.containsKey(it.id) }
             .filter { status.satisfies(NetworkType.entries[it.networkType]) }
+            .filter { device.satisfiesConstraints(it) }
+            // Global safety: don't start new downloads if the system already reports low storage.
+            .filter { !device.isStorageLow }
             .take(slots)
             .forEach { start(it) }
     }
 
+    private fun DeviceState.satisfiesConstraints(entity: DownloadEntity): Boolean =
+        satisfies(entity.requiresCharging, entity.requiresBatteryNotLow, entity.requiresStorageNotLow)
+
+    /**
+     * Starts a download. Must hold [scheduleMutex] (only [startEligible] calls it).
+     *
+     * The job is created lazily and registered in [activeJobs] BEFORE the RUNNING status is written,
+     * so there is no window where the row is RUNNING but unknown to pause/cancel. Because everything
+     * runs under the mutex, a pause/cancel arriving "at the same time" is fully ordered against this.
+     */
     private suspend fun start(entity: DownloadEntity) {
         logger.i("Starting download: ${entity.id} (${entity.url})")
-        repository.setStatus(entity.id, DownloadStatus.RUNNING)
-        val job = scope.launch { runTask(entity) }
+        val job = scope.launch(start = CoroutineStart.LAZY) { runTask(entity) }
         activeJobs[entity.id] = job
-        job.invokeOnCompletion { onJobFinished(entity.id) }
+        job.invokeOnCompletion { onJobFinished(entity.id, job) }
+        repository.setStatus(entity.id, DownloadStatus.RUNNING)
+        job.start()
     }
 
     private suspend fun runTask(entity: DownloadEntity) {
@@ -227,20 +339,36 @@ internal class DownloadEngine(
         entity: DownloadEntity,
         result: TaskResult.Completed,
     ) {
+        val finalized =
+            scheduleMutex.withLock {
+                // Only finalize as COMPLETED if the row is still RUNNING. A concurrent pause/cancel
+                // wins and must not be overwritten by a task that happened to finish right after.
+                if (repository.getEntity(entity.id)?.status != DownloadStatus.RUNNING) {
+                    return@withLock false
+                }
+                repository.setProgress(
+                    id = entity.id,
+                    downloaded = result.totalBytes,
+                    total = result.totalBytes,
+                    speed = 0,
+                    eta = 0,
+                )
+                repository.setStatus(entity.id, DownloadStatus.COMPLETED)
+                repository.clearParts(entity.id)
+                true
+            }
+        if (!finalized) return
         logger.i("Download completed: ${entity.id}")
-        repository.setProgress(
-            id = entity.id,
-            downloaded = result.totalBytes,
-            total = result.totalBytes,
-            speed = 0,
-            eta = 0,
-        )
-        repository.setStatus(entity.id, DownloadStatus.COMPLETED)
-        repository.clearParts(entity.id)
+        runPostProcessing(entity)
+    }
 
-        entity.workerClass?.let { className ->
-            val item = repository.getItem(entity.id) ?: return@let
-            config.workerFactory.create(className)?.process(item)
+    private suspend fun runPostProcessing(entity: DownloadEntity) {
+        if (entity.workerClass == null && config.postProcessors.isEmpty()) return
+        val item = repository.getItem(entity.id) ?: return
+        entity.workerClass?.let { config.workerFactory.create(it)?.process(item) }
+        config.postProcessors.forEach { processor ->
+            runCatching { processor.process(item) }
+                .onFailure { logger.e("Post-processor failed for ${entity.id}", it) }
         }
     }
 
@@ -249,26 +377,45 @@ internal class DownloadEngine(
         error: DownloadError,
     ) {
         logger.e("Download failed: ${entity.id}. Error: ${error.message}", error)
-        val attempt = entity.retryCount
-        if (error.isRetryable && attempt < entity.maxRetries) {
-            logger.i("Retrying ${entity.id} (attempt ${attempt + 1}/${entity.maxRetries})")
-            scheduleRetry(entity, error, attempt + 1)
-        } else {
-            repository.setError(entity.id, error, attempt)
+        scheduleMutex.withLock {
+            // If the row is no longer RUNNING, the user paused/cancelled/removed it while the task
+            // was unwinding. Honor that instead of recording an error or scheduling a retry.
+            if (repository.getEntity(entity.id)?.status != DownloadStatus.RUNNING) return@withLock
+            val attempt = entity.retryCount
+            if (error.isRetryable && attempt < entity.maxRetries) {
+                logger.i("Retrying ${entity.id} (attempt ${attempt + 1}/${entity.maxRetries})")
+                scheduleRetry(entity, error, attempt + 1)
+            } else {
+                repository.setError(entity.id, error, attempt)
+            }
         }
     }
 
+    /**
+     * Schedules a delayed retry. The timer is tracked in [retryJobs] so a pause/cancel/remove issued
+     * during the backoff window cancels it; otherwise the timer would re-queue a download the user
+     * just stopped. Must hold [scheduleMutex].
+     */
     private fun scheduleRetry(
         entity: DownloadEntity,
         error: DownloadError,
         nextAttempt: Int,
     ) {
-        scope.launch {
-            repository.setError(entity.id, error, nextAttempt)
-            delay(backoffMillis(entity, nextAttempt, error).milliseconds)
-            repository.setStatus(entity.id, DownloadStatus.QUEUED)
-            schedule()
-        }
+        val job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                repository.setError(entity.id, error, nextAttempt)
+                delay(backoffMillis(entity, nextAttempt, error).milliseconds)
+                scheduleMutex.withLock {
+                    // Re-queue only if still FAILED (not paused/cancelled/removed meanwhile).
+                    if (repository.getEntity(entity.id)?.status == DownloadStatus.FAILED) {
+                        repository.setStatus(entity.id, DownloadStatus.QUEUED)
+                    }
+                }
+                schedule()
+            }
+        retryJobs[entity.id] = job
+        job.invokeOnCompletion { retryJobs.remove(entity.id, job) }
+        job.start()
     }
 
     private fun backoffMillis(
@@ -284,8 +431,12 @@ internal class DownloadEngine(
         return backoff.toLong().coerceAtMost(entity.maxBackoffMillis)
     }
 
-    private fun onJobFinished(id: String) {
-        activeJobs.remove(id)
+    private fun onJobFinished(
+        id: String,
+        job: Job,
+    ) {
+        // Only clear the slot if it still holds this job; a newer start() may have replaced it.
+        activeJobs.remove(id, job)
         scope.launch { schedule() }
     }
 

@@ -18,6 +18,20 @@ class ConvertersTest {
     }
 
     @Test
+    fun `maps to and from string list`() {
+        val list = listOf("https://a.example/file", "https://b.example/file")
+        val string = converters.fromStringList(list)
+        val result = converters.toStringList(string)
+
+        assertThat(result).isEqualTo(list)
+    }
+
+    @Test
+    fun `decodes empty string to empty list`() {
+        assertThat(converters.toStringList("")).isEmpty()
+    }
+
+    @Test
     fun `maps to and from status`() {
         DownloadStatus.entries.forEach { status ->
             val ordinal = converters.fromStatus(status)
