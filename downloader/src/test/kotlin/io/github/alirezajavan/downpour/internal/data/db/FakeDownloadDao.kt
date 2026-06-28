@@ -40,7 +40,7 @@ internal class FakeDownloadDao : DownloadDao {
     ): List<DownloadEntity> =
         rows.values
             .filter { it.status in statuses }
-            .sortedWith(compareByDescending<DownloadEntity> { it.priority }.thenBy { it.createdAtMillis })
+            .sortedWith(compareByDescending<DownloadEntity> { it.priority }.thenBy { it.sortKey })
             .take(limit)
 
     override suspend fun countByStatus(status: DownloadStatus): Int = rows.values.count { it.status == status }
@@ -168,6 +168,39 @@ internal class FakeDownloadDao : DownloadDao {
     }
 
     override suspend fun getByTag(tag: String): List<DownloadEntity> = rows.values.filter { it.tag == tag }
+
+    override fun observeByTag(tag: String): Flow<List<DownloadEntity>> =
+        emissions.map { list -> sortedByCreatedDesc(list.filter { it.tag == tag }) }
+
+    override suspend fun updatePriority(
+        id: String,
+        priority: Int,
+        now: Long,
+    ) {
+        rows[id]?.let { rows[id] = it.copy(priority = priority, updatedAtMillis = now) }
+        publish()
+    }
+
+    override suspend fun minSortKey(): Long? = rows.values.minOfOrNull { it.sortKey }
+
+    override suspend fun updateSortKey(
+        id: String,
+        sortKey: Long,
+        now: Long,
+    ) {
+        rows[id]?.let { rows[id] = it.copy(sortKey = sortKey, updatedAtMillis = now) }
+        publish()
+    }
+
+    override suspend fun deleteCompletedBefore(
+        completed: DownloadStatus,
+        cutoff: Long,
+    ) {
+        rows.values
+            .filter { it.status == completed && it.updatedAtMillis < cutoff }
+            .forEach { rows.remove(it.id) }
+        publish()
+    }
 
     override suspend fun updateStatusByTag(
         tag: String,

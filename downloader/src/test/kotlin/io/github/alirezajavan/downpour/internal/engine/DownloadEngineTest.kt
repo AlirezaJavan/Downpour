@@ -4,6 +4,7 @@ import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
@@ -21,6 +22,7 @@ class DownloadEngineTest {
     private val config = DownloadManagerConfig()
     private val serviceController = mockk<DownloadServiceController>(relaxed = true)
     private val networkMonitor = mockk<NetworkMonitor>(relaxed = true)
+    private val deviceStateMonitor = mockk<DeviceStateMonitor>(relaxed = true)
     private val fileStore = mockk<FileStore>(relaxed = true)
 
     private val engine =
@@ -31,6 +33,7 @@ class DownloadEngineTest {
             config = config,
             serviceController = serviceController,
             networkMonitor = networkMonitor,
+            deviceStateMonitor = deviceStateMonitor,
             fileStore = fileStore,
             logger = NoOpLogger,
         )

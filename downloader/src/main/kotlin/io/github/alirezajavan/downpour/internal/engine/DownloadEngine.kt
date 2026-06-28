@@ -7,6 +7,8 @@ import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.device.DeviceState
+import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +30,7 @@ internal class DownloadEngine(
     private val config: DownloadManagerConfig,
     private val serviceController: DownloadServiceController,
     private val networkMonitor: NetworkMonitor,
+    private val deviceStateMonitor: DeviceStateMonitor,
     private val fileStore: FileStore,
     private val logger: Logger,
 ) {
@@ -55,6 +58,7 @@ internal class DownloadEngine(
         scheduleMutex.withLock {
             logger.d("Recovering leaked downloads...")
             startNetworkWatch()
+            config.expireCompletedAfter?.let { repository.deleteExpiredCompleted(it.inWholeMilliseconds) }
             val activeIds = activeJobs.keys.toList()
             repository.setStatusIn(
                 from = listOf(DownloadStatus.RUNNING, DownloadStatus.WAITING_FOR_NETWORK),
@@ -68,6 +72,7 @@ internal class DownloadEngine(
     private fun startNetworkWatch() {
         if (!networkWatchStarted.compareAndSet(false, true)) return
         scope.launch { networkMonitor.changes.drop(1).collect { schedule() } }
+        scope.launch { deviceStateMonitor.changes.drop(1).collect { schedule() } }
     }
 
     fun onEnqueued() {
@@ -146,6 +151,19 @@ internal class DownloadEngine(
             cancelRetry(id)
             repository.setStatus(id, DownloadStatus.QUEUED)
         }
+        schedule()
+    }
+
+    suspend fun setPriority(
+        id: String,
+        priority: Int,
+    ) {
+        scheduleMutex.withLock { repository.setPriority(id, priority) }
+        schedule()
+    }
+
+    suspend fun moveToFront(id: String) {
+        scheduleMutex.withLock { repository.moveToFront(id) }
         schedule()
     }
 
@@ -254,12 +272,19 @@ internal class DownloadEngine(
     private suspend fun schedule() =
         scheduleMutex.withLock {
             val status = networkMonitor.snapshot()
-            logger.d("Scheduling downloads. Network status: $status")
+            val device = deviceStateMonitor.snapshot()
+            logger.d("Scheduling downloads. Network status: $status, Device status: $device")
 
             activeJobs.forEach { (id, _) ->
                 val entity = repository.getEntity(id) ?: return@forEach
-                if (!status.satisfies(NetworkType.entries[entity.networkType])) {
+                val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
+                val deviceSatisfied = device.satisfiesConstraints(entity)
+
+                if (!networkSatisfied) {
                     repository.setStatus(id, DownloadStatus.WAITING_FOR_NETWORK)
+                    cancelJob(id)
+                } else if (!deviceSatisfied) {
+                    repository.setStatus(id, DownloadStatus.QUEUED)
                     cancelJob(id)
                 }
             }
@@ -271,14 +296,21 @@ internal class DownloadEngine(
 
     private suspend fun startEligible(slots: Int) {
         val status = networkMonitor.snapshot()
+        val device = deviceStateMonitor.snapshot()
         repository
             .nextQueued(QUEUE_SCAN_LIMIT)
             .asSequence()
             .filterNot { activeJobs.containsKey(it.id) }
             .filter { status.satisfies(NetworkType.entries[it.networkType]) }
+            .filter { device.satisfiesConstraints(it) }
+            // Global safety: don't start new downloads if the system already reports low storage.
+            .filter { !device.isStorageLow }
             .take(slots)
             .forEach { start(it) }
     }
+
+    private fun DeviceState.satisfiesConstraints(entity: DownloadEntity): Boolean =
+        satisfies(entity.requiresCharging, entity.requiresBatteryNotLow, entity.requiresStorageNotLow)
 
     /**
      * Starts a download. Must hold [scheduleMutex] (only [startEligible] calls it).
@@ -327,10 +359,16 @@ internal class DownloadEngine(
             }
         if (!finalized) return
         logger.i("Download completed: ${entity.id}")
+        runPostProcessing(entity)
+    }
 
-        entity.workerClass?.let { className ->
-            val item = repository.getItem(entity.id) ?: return@let
-            config.workerFactory.create(className)?.process(item)
+    private suspend fun runPostProcessing(entity: DownloadEntity) {
+        if (entity.workerClass == null && config.postProcessors.isEmpty()) return
+        val item = repository.getItem(entity.id) ?: return
+        entity.workerClass?.let { config.workerFactory.create(it)?.process(item) }
+        config.postProcessors.forEach { processor ->
+            runCatching { processor.process(item) }
+                .onFailure { logger.e("Post-processor failed for ${entity.id}", it) }
         }
     }
 

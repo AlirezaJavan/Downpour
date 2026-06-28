@@ -55,4 +55,21 @@ class HttpDownloadDataSourceTest {
 
             assertThat(info.totalBytes).isEqualTo(DownloadProgress.UNKNOWN)
         }
+
+    @Test
+    fun `header provider overlays per-request headers on every request`() =
+        runTest {
+            val withProvider =
+                HttpDownloadDataSource(
+                    OkHttpClient(),
+                    Dispatchers.Unconfined,
+                    NoOpLogger,
+                    headerProvider = { mapOf("Authorization" to "Bearer fresh-token") },
+                )
+            server.enqueue(MockResponse().setResponseCode(200).addHeader("Content-Length", "10"))
+
+            withProvider.probe(server.url("/").toString(), mapOf("Authorization" to "Bearer stale"))
+
+            assertThat(server.takeRequest().getHeader("Authorization")).isEqualTo("Bearer fresh-token")
+        }
 }

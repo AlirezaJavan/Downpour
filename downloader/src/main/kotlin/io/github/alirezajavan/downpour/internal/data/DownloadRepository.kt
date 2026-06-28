@@ -2,6 +2,7 @@ package io.github.alirezajavan.downpour.internal.data
 
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadItem
+import io.github.alirezajavan.downpour.api.GroupProgress
 import io.github.alirezajavan.downpour.internal.data.db.DownloadDao
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.db.DownloadPartEntity
@@ -60,6 +61,24 @@ internal class DownloadRepository(
     }
 
     suspend fun getByTag(tag: String): List<DownloadEntity> = dao.getByTag(tag)
+
+    suspend fun getItemsByTag(tag: String): List<DownloadItem> = dao.getByTag(tag).map { it.toItem() }
+
+    fun observeItemsByTag(tag: String): Flow<List<DownloadItem>> = dao.observeByTag(tag).map { entities -> entities.map { it.toItem() } }
+
+    fun observeGroupProgress(tag: String): Flow<GroupProgress> = dao.observeByTag(tag).map { it.toGroupProgress() }
+
+    suspend fun setPriority(
+        id: String,
+        priority: Int,
+    ) = dao.updatePriority(id, priority, clock())
+
+    suspend fun moveToFront(id: String) {
+        val front = (dao.minSortKey() ?: clock()) - 1
+        dao.updateSortKey(id, front, clock())
+    }
+
+    suspend fun deleteExpiredCompleted(ttlMillis: Long) = dao.deleteCompletedBefore(DownloadStatus.COMPLETED, clock() - ttlMillis)
 
     suspend fun setStatusByTag(
         tag: String,
@@ -143,6 +162,6 @@ internal class DownloadRepository(
 
     private companion object {
         // A row in one of these states no longer "owns" its destination path.
-        val TERMINAL_STATUSES = listOf(DownloadStatus.COMPLETED, DownloadStatus.CANCELLED)
+        val TERMINAL_STATUSES = listOf(DownloadStatus.COMPLETED, DownloadStatus.CANCELLED, DownloadStatus.FAILED)
     }
 }

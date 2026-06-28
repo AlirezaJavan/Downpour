@@ -1,37 +1,31 @@
 package io.github.alirezajavan.downpour.internal.util
 
 import com.google.common.truth.Truth.assertThat
-import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
+import io.github.alirezajavan.downpour.api.RemoteFileMetadata
 import org.junit.jupiter.api.Test
 
 class FilenameResolverTest {
     @Test
     fun `resolves from content disposition`() {
-        val info =
-            RemoteFileInfo(
-                totalBytes = 100,
-                acceptsRanges = true,
-                etag = null,
-                lastModified = null,
-                contentType = "application/pdf",
+        val metadata =
+            RemoteFileMetadata(
+                url = "https://example.com/file",
                 contentDisposition = "attachment; filename=\"document.pdf\"",
+                contentType = "application/pdf",
             )
-        val name = FilenameResolver.resolve("https://example.com/file", info)
+        val name = DefaultFilenameResolver.resolve(metadata)
         assertThat(name).isEqualTo("document.pdf")
     }
 
     @Test
     fun `resolves from url when disposition is missing`() {
-        val info =
-            RemoteFileInfo(
-                totalBytes = 100,
-                acceptsRanges = true,
-                etag = null,
-                lastModified = null,
-                contentType = "application/pdf",
+        val metadata =
+            RemoteFileMetadata(
+                url = "https://example.com/manual.pdf",
                 contentDisposition = null,
+                contentType = "application/pdf",
             )
-        val name = FilenameResolver.resolve("https://example.com/manual.pdf", info)
+        val name = DefaultFilenameResolver.resolve(metadata)
         assertThat(name).isEqualTo("manual.pdf")
     }
 }

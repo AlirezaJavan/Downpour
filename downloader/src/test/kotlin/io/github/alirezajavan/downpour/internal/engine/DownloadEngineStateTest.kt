@@ -3,10 +3,13 @@ package io.github.alirezajavan.downpour.internal.engine
 import com.google.common.truth.Truth.assertThat
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.DownloadPostProcessor
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.db.FakeDownloadDao
+import io.github.alirezajavan.downpour.internal.device.DeviceState
+import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkStatus
 import io.github.alirezajavan.downpour.internal.util.NoOpLogger
@@ -37,6 +40,7 @@ class DownloadEngineStateTest {
     private val dao = FakeDownloadDao()
     private val repository = DownloadRepository(dao) { NOW }
     private val networkMonitor = mockk<NetworkMonitor>()
+    private val deviceStateMonitor = mockk<DeviceStateMonitor>()
     private val fileStore = mockk<FileStore>(relaxed = true)
     private val serviceCounts = mutableListOf<Int>()
     private val serviceController = DownloadServiceController { serviceCounts += it }
@@ -44,6 +48,8 @@ class DownloadEngineStateTest {
     init {
         every { networkMonitor.snapshot() } returns CONNECTED
         every { networkMonitor.changes } returns emptyFlow()
+        every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED
+        every { deviceStateMonitor.changes } returns emptyFlow()
     }
 
     private fun TestScope.newEngine(
@@ -56,6 +62,7 @@ class DownloadEngineStateTest {
         config = config,
         serviceController = serviceController,
         networkMonitor = networkMonitor,
+        deviceStateMonitor = deviceStateMonitor,
         fileStore = fileStore,
         logger = NoOpLogger,
     )
@@ -274,6 +281,61 @@ class DownloadEngineStateTest {
             assertThat(status("b")).isEqualTo(DownloadStatus.RUNNING)
         }
 
+    @Test
+    fun `post-processor runs after a download completes`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val processed = mutableListOf<String>()
+            val config = DownloadManagerConfig(postProcessors = listOf(DownloadPostProcessor { processed += it.id }))
+            val engine = newEngine(ScriptedRunner(repository, Behavior.Succeed(total = 100)), config)
+
+            repository.insert(entity("a"))
+            engine.onEnqueued()
+            advanceUntilIdle()
+
+            assertThat(status("a")).isEqualTo(DownloadStatus.COMPLETED)
+            assertThat(processed).containsExactly("a")
+        }
+
+    @Test
+    fun `requiresCharging keeps a download queued until the device is charging`() =
+        runTest(UnconfinedTestDispatcher()) {
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED
+            val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
+            repository.insert(entity("a").copy(requiresCharging = true))
+
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.QUEUED)
+
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(isCharging = true)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+        }
+
+    @Test
+    fun `moveToFront makes a later download start before an earlier queued one`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val engine =
+                newEngine(
+                    ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)),
+                    DownloadManagerConfig(maxConcurrentDownloads = 1),
+                )
+            repository.insert(entity("a", createdAt = 1))
+            repository.insert(entity("b", createdAt = 2))
+            repository.insert(entity("c", createdAt = 3))
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+
+            engine.moveToFront("c")
+            engine.pause("a")
+            advanceUntilIdle()
+
+            assertThat(status("c")).isEqualTo(DownloadStatus.RUNNING)
+            assertThat(status("b")).isEqualTo(DownloadStatus.QUEUED)
+        }
+
     private fun entity(
         id: String,
         createdAt: Long = 0,
@@ -289,6 +351,7 @@ class DownloadEngineStateTest {
         tag = null,
         workerClass = null,
         priority = 0,
+        sortKey = createdAt,
         conflictStrategy = 0,
         networkType = 0,
         maxConnections = 1,
@@ -364,5 +427,6 @@ class DownloadEngineStateTest {
         const val NOW = 1_000L
         val CONNECTED = NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
         val DISCONNECTED = NetworkStatus(isConnected = false, isMetered = true, isNotRoaming = false)
+        val UNCONSTRAINED = DeviceState(isCharging = false, isBatteryLow = false, isStorageLow = false)
     }
 }

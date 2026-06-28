@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DownloadEntity::class, DownloadPartEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -24,6 +24,20 @@ internal abstract class DownloadDatabase : RoomDatabase() {
             object : Migration(3, 4) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE downloads ADD COLUMN destinationResolved INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        // Adds fallback mirrors, device-state constraints, and an explicit queue sortKey (seeded
+        // from createdAtMillis so existing ordering is preserved, then mutable via moveToFront).
+        val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN mirrors TEXT NOT NULL DEFAULT '[]'")
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN sortKey INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("UPDATE downloads SET sortKey = createdAtMillis")
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN requiresCharging INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN requiresBatteryNotLow INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN requiresStorageNotLow INTEGER NOT NULL DEFAULT 0")
                 }
             }
     }

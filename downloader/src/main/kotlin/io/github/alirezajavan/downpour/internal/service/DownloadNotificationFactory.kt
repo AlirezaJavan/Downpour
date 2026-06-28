@@ -44,7 +44,24 @@ internal class DownloadNotificationFactory(
                 .setOnlyAlertOnce(true)
                 .setProgress(MAX_PROGRESS, percent, withProgress.isEmpty())
 
+        config.contentIntentProvider?.provide(activeItems)?.let { builder.setContentIntent(it) }
         addActions(builder, activeItems)
+        config.customizer?.customize(builder, activeItems)
+        return builder.build()
+    }
+
+    fun buildCompletion(item: DownloadItem): Notification {
+        val builder =
+            NotificationCompat
+                .Builder(context, config.channelId)
+                .setSmallIcon(config.smallIconRes)
+                .setContentTitle(COMPLETION_TITLE)
+                .setContentText(item.url.substringAfterLast('/'))
+                .setAutoCancel(true)
+                .setOngoing(false)
+
+        config.contentIntentProvider?.provide(listOf(item))?.let { builder.setContentIntent(it) }
+        config.customizer?.customize(builder, listOf(item))
         return builder.build()
     }
 
@@ -162,5 +179,6 @@ internal class DownloadNotificationFactory(
     private companion object {
         const val MAX_PROGRESS = 100
         const val SINGLE = 1
+        const val COMPLETION_TITLE = "Download complete"
     }
 }

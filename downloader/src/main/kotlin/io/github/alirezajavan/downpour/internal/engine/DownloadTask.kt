@@ -6,11 +6,11 @@ import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.RemoteFileMetadata
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
-import io.github.alirezajavan.downpour.internal.util.FilenameResolver
 import io.github.alirezajavan.downpour.internal.util.Logger
 import io.github.alirezajavan.downpour.internal.util.SpeedMeter
 import kotlinx.coroutines.CancellationException
@@ -59,8 +59,9 @@ internal class DownloadTask(
 
     private suspend fun download(entity: DownloadEntity): TaskResult {
         logger.d("Executing task for ${entity.id}")
+        val activeUrl = selectUrl(entity)
         val initialDestination = entity.toDestination()
-        val info = probe(entity)
+        val info = probe(entity, activeUrl)
         val currentDestination = resolveFinalDestination(entity, initialDestination, info)
         val currentEntity =
             if (currentDestination != initialDestination) {
@@ -80,7 +81,7 @@ internal class DownloadTask(
 
         ensureSpace(currentDestination, plan)
         if (plan.isMultiConnection) fileStore.preallocate(currentDestination, plan.totalBytes)
-        execute(currentEntity, plan)
+        execute(currentEntity, plan, activeUrl)
         verifyChecksum(currentEntity, currentDestination)
         val total = if (plan.hasKnownSize) plan.totalBytes else fileStore.lengthOf(currentDestination)
         return TaskResult.Completed(total)
@@ -119,7 +120,10 @@ internal class DownloadTask(
     ): DownloadDestination.File {
         val file = File(destination.path)
         if (!file.isDirectory && file.name.contains('.')) return destination
-        val resolvedName = FilenameResolver.resolve(entity.url, info)
+        val resolvedName =
+            config.filenameResolver.resolve(
+                RemoteFileMetadata(entity.url, info.contentDisposition, info.contentType),
+            )
         val newFile = if (file.isDirectory) File(file, resolvedName) else File(file.parentFile, resolvedName)
         return DownloadDestination.File(newFile.absolutePath)
     }
@@ -174,8 +178,19 @@ internal class DownloadTask(
         ChecksumVerifier.verify(fileStore, destination, checksum)
     }
 
-    private suspend fun probe(entity: DownloadEntity): RemoteFileInfo {
-        val info = dataSource.probe(entity.url, entity.headers)
+    // The active URL rotates through [primary] + mirrors by attempt number, so each retry can fail
+    // over to a different source (e.g. a CDN mirror) without losing already-downloaded bytes.
+    private fun selectUrl(entity: DownloadEntity): String {
+        if (entity.mirrors.isEmpty()) return entity.url
+        val urls = listOf(entity.url) + entity.mirrors
+        return urls[entity.retryCount % urls.size]
+    }
+
+    private suspend fun probe(
+        entity: DownloadEntity,
+        url: String,
+    ): RemoteFileInfo {
+        val info = dataSource.probe(url, entity.headers)
         repository.setResumeMetadata(
             id = entity.id,
             supportsResume = info.acceptsRanges,
@@ -190,17 +205,24 @@ internal class DownloadTask(
         destination: DownloadDestination,
         plan: DownloadPlan,
     ) {
+        val usable = fileStore.usableSpaceFor(destination)
+        if (usable < MIN_SAFE_STORAGE_BYTES) {
+            throw DownloadError.InsufficientStorage(MIN_SAFE_STORAGE_BYTES, usable)
+        }
+
         if (!plan.hasKnownSize) return
         val required = (plan.totalBytes - plan.alreadyDownloaded).coerceAtLeast(0)
-        val usable = fileStore.usableSpaceFor(destination)
-        if (usable < required) throw DownloadError.InsufficientStorage(required, usable)
+        if (usable < required + MIN_SAFE_STORAGE_BYTES) {
+            throw DownloadError.InsufficientStorage(required + MIN_SAFE_STORAGE_BYTES, usable)
+        }
     }
 
     private suspend fun execute(
         entity: DownloadEntity,
         plan: DownloadPlan,
+        url: String,
     ) {
-        val transfer = ActiveTransfer(entity, plan, rateLimitersFor(entity))
+        val transfer = ActiveTransfer(entity, plan, rateLimitersFor(entity), url)
         try {
             runParts(transfer)
         } finally {
@@ -229,7 +251,7 @@ internal class DownloadTask(
     ) {
         val context =
             PartContext(
-                url = transfer.entity.url,
+                url = transfer.url,
                 headers = transfer.entity.headers,
                 part = part,
                 ifRange = transfer.plan.ifRange,
@@ -311,11 +333,16 @@ internal class DownloadTask(
         val entity: DownloadEntity,
         val plan: DownloadPlan,
         val rateLimiters: List<RateLimiter>,
+        val url: String,
     ) {
         val progress = AtomicLong(plan.alreadyDownloaded)
         val offsets: Map<Long, AtomicLong> =
             plan.parts.associate { it.partId to AtomicLong(it.nextByte) }
 
         fun offsetOf(part: PartPlan): AtomicLong = offsets.getValue(part.partId)
+    }
+
+    private companion object {
+        const val MIN_SAFE_STORAGE_BYTES = 100L * 1024 * 1024
     }
 }

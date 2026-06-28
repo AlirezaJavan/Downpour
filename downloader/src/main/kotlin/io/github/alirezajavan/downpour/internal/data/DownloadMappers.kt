@@ -7,6 +7,7 @@ import io.github.alirezajavan.downpour.api.DownloadItem
 import io.github.alirezajavan.downpour.api.DownloadProgress
 import io.github.alirezajavan.downpour.api.DownloadRequest
 import io.github.alirezajavan.downpour.api.DownloadState
+import io.github.alirezajavan.downpour.api.GroupProgress
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 
@@ -17,6 +18,7 @@ internal fun DownloadRequest.toEntity(
     DownloadEntity(
         id = id,
         url = url,
+        mirrors = mirrors,
         destinationPath =
             when (destination) {
                 is DownloadDestination.File -> destination.path
@@ -32,8 +34,12 @@ internal fun DownloadRequest.toEntity(
         tag = tag,
         workerClass = workerClass,
         priority = priority.ordinal,
+        sortKey = now,
         conflictStrategy = conflictStrategy.ordinal,
         networkType = networkType.ordinal,
+        requiresCharging = requiresCharging,
+        requiresBatteryNotLow = requiresBatteryNotLow,
+        requiresStorageNotLow = requiresStorageNotLow,
         maxConnections = maxConnections,
         maxBytesPerSecond = maxBytesPerSecond,
         checksumAlgorithm = checksum?.algorithm?.ordinal,
@@ -123,6 +129,17 @@ internal fun DownloadEntity.toProgress(): DownloadProgress =
         totalBytes = totalBytes,
         bytesPerSecond = bytesPerSecond,
         etaMillis = etaMillis,
+    )
+
+internal fun List<DownloadEntity>.toGroupProgress(): GroupProgress =
+    GroupProgress(
+        total = size,
+        completed = count { it.status == DownloadStatus.COMPLETED },
+        failed = count { it.status == DownloadStatus.FAILED },
+        running = count { it.status == DownloadStatus.RUNNING },
+        queued = count { it.status == DownloadStatus.QUEUED },
+        downloadedBytes = sumOf { it.downloadedBytes },
+        totalBytes = sumOf { it.totalBytes.coerceAtLeast(0) },
     )
 
 internal fun DownloadEntity.toDiagnosticReport(): DiagnosticReport =

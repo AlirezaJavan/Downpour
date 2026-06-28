@@ -27,7 +27,7 @@ internal interface DownloadDao {
 
     @Query(
         "SELECT * FROM downloads WHERE status IN (:statuses) " +
-            "ORDER BY priority DESC, createdAtMillis ASC LIMIT :limit",
+            "ORDER BY priority DESC, sortKey ASC LIMIT :limit",
     )
     suspend fun getByStatuses(
         statuses: List<DownloadStatus>,
@@ -150,6 +150,32 @@ internal interface DownloadDao {
 
     @Query("SELECT * FROM downloads WHERE tag = :tag")
     suspend fun getByTag(tag: String): List<DownloadEntity>
+
+    @Query("SELECT * FROM downloads WHERE tag = :tag ORDER BY createdAtMillis DESC")
+    fun observeByTag(tag: String): Flow<List<DownloadEntity>>
+
+    @Query("UPDATE downloads SET priority = :priority, updatedAtMillis = :now WHERE id = :id")
+    suspend fun updatePriority(
+        id: String,
+        priority: Int,
+        now: Long,
+    )
+
+    @Query("SELECT MIN(sortKey) FROM downloads")
+    suspend fun minSortKey(): Long?
+
+    @Query("UPDATE downloads SET sortKey = :sortKey, updatedAtMillis = :now WHERE id = :id")
+    suspend fun updateSortKey(
+        id: String,
+        sortKey: Long,
+        now: Long,
+    )
+
+    @Query("DELETE FROM downloads WHERE status = :completed AND updatedAtMillis < :cutoff")
+    suspend fun deleteCompletedBefore(
+        completed: DownloadStatus,
+        cutoff: Long,
+    )
 
     @Query("UPDATE downloads SET status = :status, updatedAtMillis = :now WHERE tag = :tag AND status IN (:from)")
     suspend fun updateStatusByTag(

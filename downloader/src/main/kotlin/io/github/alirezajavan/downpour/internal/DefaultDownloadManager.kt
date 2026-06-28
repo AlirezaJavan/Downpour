@@ -2,9 +2,12 @@ package io.github.alirezajavan.downpour.internal
 
 import io.github.alirezajavan.downpour.api.DiagnosticReport
 import io.github.alirezajavan.downpour.api.DownloadItem
+import io.github.alirezajavan.downpour.api.DownloadListener
 import io.github.alirezajavan.downpour.api.DownloadManager
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadRequest
+import io.github.alirezajavan.downpour.api.GroupProgress
+import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.toDiagnosticReport
 import io.github.alirezajavan.downpour.internal.data.toEntity
@@ -21,6 +24,7 @@ internal class DefaultDownloadManager(
     private val scope: CoroutineScope,
     private val config: DownloadManagerConfig,
     private val logger: Logger,
+    private val eventDispatcher: DownloadEventDispatcher,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idProvider: () -> String = { UUID.randomUUID().toString() },
 ) : DownloadManager {
@@ -38,6 +42,15 @@ internal class DefaultDownloadManager(
         }
         return id
     }
+
+    override fun enqueueAll(requests: List<DownloadRequest>): List<String> = requests.map { enqueue(it) }
+
+    override suspend fun setPriority(
+        id: String,
+        priority: Priority,
+    ): Unit = engine.setPriority(id, priority.ordinal)
+
+    override suspend fun moveToFront(id: String): Unit = engine.moveToFront(id)
 
     override suspend fun pause(id: String): Unit = engine.pause(id)
 
@@ -75,7 +88,17 @@ internal class DefaultDownloadManager(
 
     override suspend fun getAll(): List<DownloadItem> = repository.getAllItems()
 
+    override suspend fun getByTag(tag: String): List<DownloadItem> = repository.getItemsByTag(tag)
+
     override fun observe(id: String): Flow<DownloadItem?> = repository.observeItem(id)
 
     override fun observeAll(): Flow<List<DownloadItem>> = repository.observeAllItems()
+
+    override fun observeByTag(tag: String): Flow<List<DownloadItem>> = repository.observeItemsByTag(tag)
+
+    override fun observeGroupProgress(tag: String): Flow<GroupProgress> = repository.observeGroupProgress(tag)
+
+    override fun addListener(listener: DownloadListener): Unit = eventDispatcher.add(listener)
+
+    override fun removeListener(listener: DownloadListener): Unit = eventDispatcher.remove(listener)
 }

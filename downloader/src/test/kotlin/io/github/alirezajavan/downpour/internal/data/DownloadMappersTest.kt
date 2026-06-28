@@ -27,6 +27,38 @@ class DownloadMappersTest {
     }
 
     @Test
+    fun `toEntity carries mirrors and device constraints`() {
+        val request =
+            downloadRequest("https://example.com", "/path/to/file") {
+                mirror("https://mirror.example/file")
+                requiresCharging(true)
+                requiresStorageNotLow(true)
+            }
+        val entity = request.toEntity("id", 50L)
+
+        assertThat(entity.mirrors).containsExactly("https://mirror.example/file")
+        assertThat(entity.requiresCharging).isTrue()
+        assertThat(entity.requiresStorageNotLow).isTrue()
+        assertThat(entity.sortKey).isEqualTo(50L)
+    }
+
+    @Test
+    fun `toGroupProgress aggregates statuses and bytes`() {
+        val a = downloadRequest("https://example.com/a", "/a").toEntity("a", 1L).copy(downloadedBytes = 30, totalBytes = 100)
+        val b =
+            downloadRequest("https://example.com/b", "/b")
+                .toEntity("b", 2L)
+                .copy(status = DownloadStatus.COMPLETED, downloadedBytes = 100, totalBytes = 100)
+
+        val progress = listOf(a, b).toGroupProgress()
+
+        assertThat(progress.total).isEqualTo(2)
+        assertThat(progress.completed).isEqualTo(1)
+        assertThat(progress.downloadedBytes).isEqualTo(130)
+        assertThat(progress.totalBytes).isEqualTo(200)
+    }
+
+    @Test
     fun `toItem maps entity back to item correctly`() {
         val request =
             downloadRequest("https://example.com", "/path/to/file") {

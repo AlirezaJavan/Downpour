@@ -95,16 +95,31 @@ internal class PartDownloader(
             sink.seek(startPosition)
             val buffer = ByteArray(bufferSize)
             var absoluteOffset = startPosition
+            var bytesSinceSpaceCheck = 0L
             while (true) {
                 currentCoroutineContext().ensureActive()
+
+                if (bytesSinceSpaceCheck >= SPACE_CHECK_INTERVAL) {
+                    verifySpace(context)
+                    bytesSinceSpaceCheck = 0
+                }
+
                 val read = readChunk(stream, buffer)
                 if (read == END_OF_STREAM) break
                 sink.write(buffer, 0, read)
                 absoluteOffset += read
+                bytesSinceSpaceCheck += read
                 context.progress.addAndGet(read.toLong())
                 context.partOffset.set(absoluteOffset)
                 throttle(context, read)
             }
+        }
+    }
+
+    private fun verifySpace(context: PartContext) {
+        val usable = fileStore.usableSpaceFor(context.destination)
+        if (usable < MIN_SAFE_STORAGE_BYTES) {
+            throw DownloadError.InsufficientStorage(MIN_SAFE_STORAGE_BYTES, usable)
         }
     }
 
@@ -138,6 +153,8 @@ internal class PartDownloader(
         const val DEFAULT_BUFFER_SIZE = 64 * 1024
         const val HTTP_PARTIAL = 206
         const val END_OF_STREAM = -1
+        const val SPACE_CHECK_INTERVAL = 5L * 1024 * 1024 // 5MB
+        const val MIN_SAFE_STORAGE_BYTES = 100L * 1024 * 1024 // 100MB
     }
 }
 

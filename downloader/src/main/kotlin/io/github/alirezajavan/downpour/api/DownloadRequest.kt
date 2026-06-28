@@ -14,6 +14,10 @@ public class DownloadRequest private constructor(
     public val tag: String?,
     public val workerClass: String?,
     public val metadata: Map<String, String>,
+    public val mirrors: List<String>,
+    public val requiresCharging: Boolean,
+    public val requiresBatteryNotLow: Boolean,
+    public val requiresStorageNotLow: Boolean,
 ) {
     @Deprecated("Use destination instead", ReplaceWith("destination"))
     public val destinationPath: String
@@ -28,6 +32,7 @@ public class DownloadRequest private constructor(
 
         private val headers = mutableMapOf<String, String>()
         private val metadata = mutableMapOf<String, String>()
+        private val mirrors = mutableListOf<String>()
         private var priority: Priority = Priority.NORMAL
         private var conflictStrategy: ConflictStrategy = ConflictStrategy.OVERWRITE
         private var networkType: NetworkType = NetworkType.ANY
@@ -37,6 +42,9 @@ public class DownloadRequest private constructor(
         private var checksum: Checksum? = null
         private var tag: String? = null
         private var workerClass: String? = null
+        private var requiresCharging: Boolean = false
+        private var requiresBatteryNotLow: Boolean = false
+        private var requiresStorageNotLow: Boolean = false
 
         public fun header(
             name: String,
@@ -73,6 +81,16 @@ public class DownloadRequest private constructor(
 
         public fun workerClass(className: String): Builder = apply { this.workerClass = className }
 
+        public fun mirror(url: String): Builder = apply { mirrors.add(url) }
+
+        public fun mirrors(urls: List<String>): Builder = apply { mirrors.addAll(urls) }
+
+        public fun requiresCharging(required: Boolean): Builder = apply { this.requiresCharging = required }
+
+        public fun requiresBatteryNotLow(required: Boolean): Builder = apply { this.requiresBatteryNotLow = required }
+
+        public fun requiresStorageNotLow(required: Boolean): Builder = apply { this.requiresStorageNotLow = required }
+
         public fun metadata(
             key: String,
             value: String,
@@ -94,6 +112,10 @@ public class DownloadRequest private constructor(
                 tag = tag,
                 workerClass = workerClass,
                 metadata = metadata.toMap(),
+                mirrors = mirrors.toList(),
+                requiresCharging = requiresCharging,
+                requiresBatteryNotLow = requiresBatteryNotLow,
+                requiresStorageNotLow = requiresStorageNotLow,
             )
         }
     }

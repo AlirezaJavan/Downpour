@@ -1,6 +1,8 @@
 package io.github.alirezajavan.downpour.internal.util
 
 import android.util.Log
+import io.github.alirezajavan.downpour.api.DownloadLogger
+import io.github.alirezajavan.downpour.api.LogLevel
 
 internal interface Logger {
     fun d(message: String)
@@ -46,6 +48,24 @@ internal class AndroidLogger(
     private companion object {
         const val TAG = "Downpour"
     }
+}
+
+internal class DownloadLoggerAdapter(
+    private val delegate: DownloadLogger,
+) : Logger {
+    override fun d(message: String) = delegate.log(LogLevel.DEBUG, message, null)
+
+    override fun i(message: String) = delegate.log(LogLevel.INFO, message, null)
+
+    override fun w(
+        message: String,
+        throwable: Throwable?,
+    ) = delegate.log(LogLevel.WARN, message, throwable)
+
+    override fun e(
+        message: String,
+        throwable: Throwable?,
+    ) = delegate.log(LogLevel.ERROR, message, throwable)
 }
 
 internal object NoOpLogger : Logger {

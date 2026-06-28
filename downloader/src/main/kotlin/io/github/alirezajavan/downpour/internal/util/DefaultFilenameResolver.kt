@@ -1,24 +1,26 @@
 package io.github.alirezajavan.downpour.internal.util
 
 import android.webkit.MimeTypeMap
-import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
+import io.github.alirezajavan.downpour.api.FilenameResolver
+import io.github.alirezajavan.downpour.api.RemoteFileMetadata
 
-internal object FilenameResolver {
+internal object DefaultFilenameResolver : FilenameResolver {
     private const val DISPOSITION_FILENAME = "filename="
     private const val DISPOSITION_FILENAME_STAR = "filename*="
 
-    fun resolve(
-        url: String,
-        info: RemoteFileInfo,
-    ): String {
-        val fromDisposition = info.contentDisposition?.let { parseDisposition(it) }
+    override fun resolve(metadata: RemoteFileMetadata): String {
+        val fromDisposition = metadata.contentDisposition?.let { parseDisposition(it) }
         if (!fromDisposition.isNullOrBlank()) return fromDisposition
 
-        val fromUrl = url.substringAfterLast('/').substringBefore('?').substringBefore('#')
+        val fromUrl =
+            metadata.url
+                .substringAfterLast('/')
+                .substringBefore('?')
+                .substringBefore('#')
         if (fromUrl.isNotBlank() && fromUrl.contains('.')) return fromUrl
 
         val extension =
-            info.contentType?.let {
+            metadata.contentType?.let {
                 MimeTypeMap.getSingleton().getExtensionFromMimeType(it.substringBefore(';'))
             }
 
