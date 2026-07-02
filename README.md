@@ -362,3 +362,5 @@ The engine serializes every state transition under a single lock, so user action
 ## License
 
 Downpour is available under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+Copyright © 2026 Alireza Javan
