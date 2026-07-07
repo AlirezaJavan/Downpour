@@ -9,7 +9,7 @@ import java.security.MessageDigest
 internal object ChecksumVerifier {
     private const val BUFFER_SIZE = 64 * 1024
     private const val END_OF_STREAM = -1
-    private const val HEX_RADIX = 0xFF
+    private const val HEX_BYTE_MASK = 0xFF
 
     fun verify(
         fileStore: FileStore,
@@ -43,7 +43,7 @@ internal object ChecksumVerifier {
 
     private fun ByteArray.toHex(): String =
         joinToString("") { byte ->
-            (byte.toInt() and HEX_RADIX).toString(HEX_BASE).padStart(HEX_WIDTH, '0')
+            (byte.toInt() and HEX_BYTE_MASK).toString(HEX_BASE).padStart(HEX_WIDTH, '0')
         }
 
     private const val HEX_BASE = 16

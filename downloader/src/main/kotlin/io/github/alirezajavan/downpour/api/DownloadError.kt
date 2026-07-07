@@ -21,10 +21,8 @@ public sealed class DownloadError(
     public class InsufficientStorage(
         requiredBytes: Long,
         availableBytes: Long,
-    ) : DownloadError(
-            "Not enough free space: required=$requiredBytes available=$availableBytes",
-            null,
-        )
+        message: String = "Not enough free space: required=$requiredBytes available=$availableBytes",
+    ) : DownloadError(message, null)
 
     public class FileAlreadyExists(
         filePath: String,

@@ -14,10 +14,7 @@ internal class ConnectionTuner(
     fun decide(
         currentConnections: Int,
         currentSpeed: Long,
-    ): Int {
-        val result = decideRaw(currentConnections, currentSpeed)
-        return result.coerceIn(minConnections, maxConnections)
-    }
+    ): Int = decideRaw(currentConnections, currentSpeed).coerceIn(minConnections, maxConnections)
 
     private fun decideRaw(
         currentConnections: Int,
@@ -26,52 +23,62 @@ internal class ConnectionTuner(
         if (lastConnections == -1) {
             lastConnections = currentConnections
             lastSpeed = currentSpeed
-            // Try to increase initially to see if it helps
+            // No history yet: probe upward to see whether adding a connection helps at all.
             return currentConnections + 1
         }
 
-        if (currentConnections > lastConnections) {
-            // We increased connections. Did speed improve significantly?
-            // "Roughly linearly" means if we went from 2 to 3 (50% increase in connections),
-            // we expect something like 50% increase in speed.
-            // Let's be conservative and require at least 50% of the expected linear gain.
-
-            val speedGain = currentSpeed - lastSpeed
-            val expectedLinearGain = lastSpeed.toDouble() / lastConnections
-
-            val threshold = expectedLinearGain * 0.5
-
-            if (speedGain > threshold && currentSpeed > lastSpeed) {
-                // It helped, try more
-                lastConnections = currentConnections
-                lastSpeed = currentSpeed
-                return currentConnections + 1
-            } else {
-                // Plateaued or worse. Hold or go back?
-                // Plan says "hold or reduce". Let's hold for now, or maybe reduce if it's much worse.
-                if (currentSpeed < lastSpeed * 0.8) { // 20% drop
-                    return lastConnections // Go back
-                }
-                return currentConnections // Hold
+        return when {
+            currentConnections > lastConnections -> {
+                afterIncrease(currentConnections, currentSpeed)
             }
-        } else if (currentConnections < lastConnections) {
-            // We reduced. Did speed stay the same?
-            if (currentSpeed >= lastSpeed * 0.9) {
-                // Reducing didn't hurt much, maybe stay here or reduce more?
-                lastConnections = currentConnections
+
+            currentConnections < lastConnections -> {
+                afterDecrease(currentConnections, currentSpeed)
+            }
+
+            else -> {
                 lastSpeed = currentSpeed
-                return currentConnections
-            } else {
-                // Reducing hurt, go back up?
-                return lastConnections
+                currentConnections
             }
         }
+    }
 
-        // currentConnections == lastConnections
-        // Periodically try to increase again?
-        // Maybe if speed is zero or very low, we might be stalled.
+    // We just added a connection. A healthy gain scales roughly linearly with connection count
+    // (e.g. 2 -> 3 connections should buy ~50% more throughput); require at least half of that
+    // expected gain before trusting it enough to probe further.
+    private fun afterIncrease(
+        currentConnections: Int,
+        currentSpeed: Long,
+    ): Int {
+        val speedGain = currentSpeed - lastSpeed
+        val expectedLinearGain = lastSpeed.toDouble() / lastConnections
+        val gainedEnough = speedGain > expectedLinearGain * MIN_GAIN_FRACTION && currentSpeed > lastSpeed
 
+        if (gainedEnough) {
+            lastConnections = currentConnections
+            lastSpeed = currentSpeed
+            return currentConnections + 1
+        }
+        // Plateaued or worse: hold here, unless the extra connection actively made things worse,
+        // in which case back off to the last known-good count.
+        return if (currentSpeed < lastSpeed * REGRESSION_THRESHOLD) lastConnections else currentConnections
+    }
+
+    // We just dropped a connection (e.g. after a 429 downgrade). If speed held up, settle at the
+    // lower count; if it tanked, the drop wasn't worth it and we go back to the prior count.
+    private fun afterDecrease(
+        currentConnections: Int,
+        currentSpeed: Long,
+    ): Int {
+        if (currentSpeed < lastSpeed * MIN_RETAINED_FRACTION) return lastConnections
+        lastConnections = currentConnections
         lastSpeed = currentSpeed
         return currentConnections
+    }
+
+    private companion object {
+        const val MIN_GAIN_FRACTION = 0.5
+        const val REGRESSION_THRESHOLD = 0.8
+        const val MIN_RETAINED_FRACTION = 0.9
     }
 }

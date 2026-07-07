@@ -17,7 +17,10 @@ import io.github.alirezajavan.downpour.internal.engine.DownloadTask
 import io.github.alirezajavan.downpour.internal.engine.DownloadTaskRunner
 import io.github.alirezajavan.downpour.internal.engine.PartDownloader
 import io.github.alirezajavan.downpour.internal.engine.RateLimiter
+import io.github.alirezajavan.downpour.internal.network.AdaptiveDns
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
+import io.github.alirezajavan.downpour.internal.network.Ipv6FailureListener
+import io.github.alirezajavan.downpour.internal.network.Ipv6HealthTracker
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.service.CompletionNotificationListener
 import io.github.alirezajavan.downpour.internal.service.DownloadNotificationFactory
@@ -29,9 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import okhttp3.Dns
 import okhttp3.OkHttpClient
-import java.net.Inet4Address
 import java.util.concurrent.TimeUnit
 
 internal class DownloaderGraph private constructor(
@@ -56,12 +57,23 @@ internal class DownloaderGraph private constructor(
 
     val repository = DownloadRepository(database.downloadDao())
 
+    // Starts pre-tripped when the user has explicitly opted into preferIpv4; otherwise dual-stack
+    // is tried first and this flips automatically on the first observed IPv6 connect failure.
+    private val ipv6HealthTracker = Ipv6HealthTracker(startTripped = config.preferIpv4)
+
     private val httpClient =
         (config.okHttpClient ?: OkHttpClient())
             .newBuilder()
             .apply {
-                if (config.preferIpv4) {
-                    dns(IPv4OnlyDns)
+                if (config.okHttpClient == null) {
+                    // We own this client outright, so it's safe to install our own Dns/EventListener
+                    // for automatic IPv6-failure detection. For a caller-supplied OkHttpClient we
+                    // don't clobber their Dns/EventListener with this opportunistic behavior -- only
+                    // the explicit preferIpv4 opt-in below applies in that case.
+                    dns(AdaptiveDns(ipv6HealthTracker))
+                    eventListener(Ipv6FailureListener(ipv6HealthTracker))
+                } else if (config.preferIpv4) {
+                    dns(AdaptiveDns(ipv6HealthTracker))
                 }
                 config.proxy?.let { proxy(it) }
                 config.cookieJar?.let { cookieJar(it) }
@@ -140,13 +152,6 @@ internal class DownloaderGraph private constructor(
 
     init {
         scope.launch { engine.recover() }
-    }
-
-    private object IPv4OnlyDns : Dns {
-        override fun lookup(hostname: String) =
-            Dns.SYSTEM.lookup(hostname).filter { it is Inet4Address }.ifEmpty {
-                Dns.SYSTEM.lookup(hostname)
-            }
     }
 
     companion object {
