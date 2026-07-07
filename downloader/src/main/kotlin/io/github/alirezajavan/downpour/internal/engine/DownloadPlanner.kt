@@ -17,13 +17,121 @@ internal class DownloadPlanner(
         activeConnections: Int = -1,
     ): DownloadPlan {
         val ifRange = info.etag ?: info.lastModified
-        val connections = if (activeConnections > 0) activeConnections else entity.maxConnections
+        val requestedConnections = if (activeConnections > 0) activeConnections else entity.maxConnections
 
-        if (!shouldUseMultiConnection(info, connections)) {
+        if (!shouldUseMultiConnection(info, requestedConnections)) {
             return singleConnectionPlan(info, ifRange, fileLength)
         }
         val resumed = resumePlanOrNull(entity, info, ifRange)
-        return resumed ?: freshMultiConnectionPlan(entity, info, ifRange, connections)
+        if (resumed != null) {
+            if (activeConnections > 0 && resumed.parts.size != requestedConnections) {
+                return adjustConnections(entity, info, resumed.parts, requestedConnections)
+            }
+            return resumed
+        }
+        return freshMultiConnectionPlan(entity, info, ifRange, requestedConnections)
+    }
+
+    private suspend fun adjustConnections(
+        entity: DownloadEntity,
+        info: RemoteFileInfo,
+        parts: List<PartPlan>,
+        target: Int,
+    ): DownloadPlan {
+        val currentEntities = repository.getParts(entity.id)
+        return if (target > parts.size) {
+            scaleUp(entity, info, currentEntities, target)
+        } else {
+            scaleDown(entity, info, currentEntities, target)
+        }
+    }
+
+    private suspend fun scaleUp(
+        entity: DownloadEntity,
+        info: RemoteFileInfo,
+        parts: List<DownloadPartEntity>,
+        target: Int,
+    ): DownloadPlan {
+        val newParts = parts.toMutableList()
+        while (newParts.size < target && newParts.size < MAX_PARTS) {
+            val partToSplit =
+                newParts
+                    .filter { it.currentOffset < it.endByte || it.endByte == OPEN_ENDED }
+                    .maxByOrNull {
+                        if (it.endByte == OPEN_ENDED) Long.MAX_VALUE else it.endByte - it.currentOffset
+                    } ?: break
+
+            val remaining =
+                if (partToSplit.endByte == OPEN_ENDED) {
+                    DEFAULT_SPLIT_SIZE
+                } else {
+                    partToSplit.endByte - partToSplit.currentOffset
+                }
+
+            if (remaining < config.minSizeForMultiConnection / 2) break
+
+            val splitPoint = partToSplit.currentOffset + (remaining / 2)
+            newParts.remove(partToSplit)
+            newParts.add(partToSplit.copy(endByte = splitPoint))
+            newParts.add(
+                DownloadPartEntity(
+                    downloadId = entity.id,
+                    index = 0, // Will re-index below
+                    startByte = splitPoint + 1,
+                    endByte = partToSplit.endByte,
+                    currentOffset = splitPoint + 1,
+                ),
+            )
+        }
+
+        val reindexed =
+            newParts.sortedBy { it.startByte }.mapIndexed { index, part ->
+                part.copy(index = index)
+            }
+        repository.replaceParts(reindexed)
+        return DownloadPlan(
+            info.totalBytes,
+            reindexed.map { it.toPartPlan() },
+            info.etag ?: info.lastModified,
+            isMultiConnection = true,
+        )
+    }
+
+    private suspend fun scaleDown(
+        entity: DownloadEntity,
+        info: RemoteFileInfo,
+        parts: List<DownloadPartEntity>,
+        target: Int,
+    ): DownloadPlan {
+        val newParts = parts.sortedBy { it.startByte }.toMutableList()
+        while (newParts.size > target && newParts.size > 1) {
+            val last = newParts.removeAt(newParts.size - 1)
+            val secondLast = newParts.removeAt(newParts.size - 1)
+
+            val merged =
+                secondLast.copy(
+                    endByte = last.endByte,
+                    currentOffset =
+                        if (secondLast.currentOffset <= secondLast.endByte) {
+                            secondLast.currentOffset
+                        } else {
+                            last.currentOffset
+                        },
+                )
+            newParts.add(merged)
+        }
+
+        val reindexed =
+            newParts.sortedBy { it.startByte }.mapIndexed { index, part ->
+                part.copy(index = index)
+            }
+        repository.replaceParts(reindexed)
+        return DownloadPlan(
+            info.totalBytes,
+            reindexed.map { it.toPartPlan() },
+            info.etag ?: info.lastModified,
+            isMultiConnection = true,
+        )
     }
 
     private fun shouldUseMultiConnection(
@@ -111,5 +219,6 @@ internal class DownloadPlanner(
     private companion object {
         const val OPEN_ENDED = -1L
         const val MAX_PARTS = 16
+        const val DEFAULT_SPLIT_SIZE = 1024L * 1024 * 100 // 100MB
     }
 }

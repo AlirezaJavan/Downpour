@@ -73,6 +73,11 @@ internal class DownloadRepository(
         priority: Int,
     ) = dao.updatePriority(id, priority, clock())
 
+    suspend fun setEffectiveConnections(
+        id: String,
+        connections: Int,
+    ) = dao.updateEffectiveConnections(id, connections, clock())
+
     suspend fun moveToFront(id: String) {
         val front = (dao.minSortKey() ?: clock()) - 1
         dao.updateSortKey(id, front, clock())

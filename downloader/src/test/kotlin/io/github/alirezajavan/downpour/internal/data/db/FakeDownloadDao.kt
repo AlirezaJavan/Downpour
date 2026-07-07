@@ -181,6 +181,15 @@ internal class FakeDownloadDao : DownloadDao {
         publish()
     }
 
+    override suspend fun updateEffectiveConnections(
+        id: String,
+        connections: Int,
+        now: Long,
+    ) {
+        rows[id]?.let { rows[id] = it.copy(effectiveConnections = connections, updatedAtMillis = now) }
+        publish()
+    }
+
     override suspend fun minSortKey(): Long? = rows.values.minOfOrNull { it.sortKey }
 
     override suspend fun updateSortKey(

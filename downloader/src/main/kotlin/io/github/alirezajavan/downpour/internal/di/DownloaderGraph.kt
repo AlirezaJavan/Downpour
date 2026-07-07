@@ -50,7 +50,7 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).addMigrations(DownloadDatabase.MIGRATION_3_4, DownloadDatabase.MIGRATION_4_5)
+            ).addMigrations(DownloadDatabase.MIGRATION_3_4, DownloadDatabase.MIGRATION_4_5, DownloadDatabase.MIGRATION_5_6)
             .fallbackToDestructiveMigration(false)
             .build()
 

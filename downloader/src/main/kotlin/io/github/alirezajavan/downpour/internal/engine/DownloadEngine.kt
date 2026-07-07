@@ -36,6 +36,7 @@ internal class DownloadEngine(
 ) {
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val retryJobs = ConcurrentHashMap<String, Job>()
+    private val tuningJobs = ConcurrentHashMap<String, Job>()
 
     /**
      * Serializes every state transition. All status writes plus (de)registration of running jobs
@@ -323,9 +324,68 @@ internal class DownloadEngine(
         logger.i("Starting download: ${entity.id} (${entity.url})")
         val job = scope.launch(start = CoroutineStart.LAZY) { runTask(entity) }
         activeJobs[entity.id] = job
-        job.invokeOnCompletion { onJobFinished(entity.id, job) }
+        job.invokeOnCompletion {
+            onJobFinished(entity.id, job)
+            cancelTuning(entity.id)
+        }
         repository.setStatus(entity.id, DownloadStatus.RUNNING)
+
+        if (config.adaptiveConcurrency && entity.supportsResume) {
+            startAdaptiveTuning(entity.id, entity.maxConnections)
+        }
+
         job.start()
+    }
+
+    private fun startAdaptiveTuning(
+        id: String,
+        maxConnections: Int,
+    ) {
+        cancelTuning(id)
+        val tuner = ConnectionTuner(config.minConnections, maxConnections.coerceAtMost(MAX_PARTS))
+        val job =
+            scope.launch {
+                while (true) {
+                    delay(config.concurrencyReevaluationInterval)
+                    val entity = repository.getEntity(id) ?: break
+                    if (entity.status != DownloadStatus.RUNNING) break
+
+                    val current =
+                        if (entity.effectiveConnections > 0) {
+                            entity.effectiveConnections
+                        } else {
+                            entity.maxConnections
+                        }
+                    val next = tuner.decide(current, entity.bytesPerSecond)
+
+                    if (next != current) {
+                        logger.d("Adaptive concurrency tuning for $id: $current -> $next")
+                        replan(id, next)
+                        break
+                    }
+                }
+            }
+        tuningJobs[id] = job
+    }
+
+    private suspend fun replan(
+        id: String,
+        connections: Int,
+    ) {
+        scheduleMutex.withLock {
+            val entity = repository.getEntity(id) ?: return@withLock
+            if (entity.status != DownloadStatus.RUNNING) return@withLock
+            repository.setEffectiveConnections(id, connections)
+            // Requeue rather than mutate the running transfer directly: cancelJob alone leaves the
+            // row RUNNING with no active job, and nextQueued() only scans QUEUED/WAITING_FOR_NETWORK,
+            // so the download would never restart.
+            repository.setStatus(id, DownloadStatus.QUEUED)
+            cancelJob(id)
+        }
+    }
+
+    private fun cancelTuning(id: String) {
+        tuningJobs.remove(id)?.cancel()
     }
 
     private suspend fun runTask(entity: DownloadEntity) {
@@ -442,6 +502,7 @@ internal class DownloadEngine(
 
     private companion object {
         const val QUEUE_SCAN_LIMIT = 256
+        const val MAX_PARTS = 16
         val ACTIVE_STATUSES =
             listOf(DownloadStatus.QUEUED, DownloadStatus.RUNNING, DownloadStatus.WAITING_FOR_NETWORK)
         val INTERRUPTIBLE_STATUSES =

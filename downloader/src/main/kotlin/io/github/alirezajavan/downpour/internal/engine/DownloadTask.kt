@@ -305,7 +305,9 @@ internal class DownloadTask(
     }
 
     private fun calculateDynamicConnections(entity: DownloadEntity): Int {
-        // Dynamic concurrency placeholder - currently returns entity max
+        if (config.adaptiveConcurrency && entity.effectiveConnections > 0) {
+            return entity.effectiveConnections
+        }
         return entity.maxConnections
     }
 

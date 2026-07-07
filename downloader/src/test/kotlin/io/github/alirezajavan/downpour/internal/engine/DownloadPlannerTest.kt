@@ -71,6 +71,50 @@ class DownloadPlannerTest {
             assertThat(plan.isMultiConnection).isFalse()
         }
 
+    @Test
+    fun `plan scales up when activeConnections is greater than current parts`() =
+        runTest {
+            val entity = createMockEntity(maxConnections = 2).copy(etag = "etag")
+            val info = RemoteFileInfo(2000, true, "etag", null, null, null)
+
+            // Mock current 2 parts
+            val parts =
+                listOf(
+                    DownloadPartEntity(1, "id", 0, 0, 999, 0),
+                    DownloadPartEntity(2, "id", 1, 1000, 1999, 1000),
+                )
+            coEvery { repository.getParts("id") } returns parts
+            coEvery { repository.replaceParts(any()) } returns Unit
+
+            // Plan with 4 connections
+            val plan = planner.plan(entity, info, 0, activeConnections = 4)
+
+            assertThat(plan.parts).hasSize(4)
+        }
+
+    @Test
+    fun `plan scales down when activeConnections is less than current parts`() =
+        runTest {
+            val entity = createMockEntity(maxConnections = 4).copy(etag = "etag")
+            val info = RemoteFileInfo(2000, true, "etag", null, null, null)
+
+            // Mock current 4 parts
+            val parts =
+                listOf(
+                    DownloadPartEntity(1, "id", 0, 0, 499, 0),
+                    DownloadPartEntity(2, "id", 1, 500, 999, 500),
+                    DownloadPartEntity(3, "id", 2, 1000, 1499, 1000),
+                    DownloadPartEntity(4, "id", 3, 1500, 1999, 1500),
+                )
+            coEvery { repository.getParts("id") } returns parts
+            coEvery { repository.replaceParts(any()) } returns Unit
+
+            // Plan with 2 connections
+            val plan = planner.plan(entity, info, 0, activeConnections = 2)
+
+            assertThat(plan.parts).hasSize(2)
+        }
+
     private fun createMockEntity(maxConnections: Int) =
         DownloadEntity(
             id = "id",

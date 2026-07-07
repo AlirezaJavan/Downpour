@@ -9,6 +9,7 @@ import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
 import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
 import io.github.alirezajavan.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -53,13 +54,45 @@ class DownloadTaskTest {
                     contentDisposition = null,
                 )
             coEvery { dataSource.probe(any(), any()) } returns info
-            coEvery { planner.plan(any(), any(), any(), any()) } returns DownloadPlan(100, emptyList(), null, false)
+            coEvery { planner.plan(any(), any(), any(), any()) } returns
+                DownloadPlan(100, emptyList(), null, false)
             every { fileStore.lengthOf(any()) } returns 100
             every { fileStore.usableSpaceFor(any()) } returns 1000
 
             val result = task.run(entity)
 
             assertThat(result).isInstanceOf(TaskResult.Completed::class.java)
+        }
+
+    @Test
+    fun `run uses effectiveConnections when adaptive concurrency is enabled`() =
+        runTest {
+            val adaptiveConfig = config.copy(adaptiveConcurrency = true)
+            val taskWithAdaptive =
+                DownloadTask(
+                    dataSource = dataSource,
+                    planner = planner,
+                    partDownloader = partDownloader,
+                    repository = repository,
+                    config = adaptiveConfig,
+                    globalRateLimiter = globalRateLimiter,
+                    ioDispatcher = Dispatchers.Unconfined,
+                    fileStore = fileStore,
+                    logger = NoOpLogger,
+                    destinationMutex = Mutex(),
+                )
+
+            val entity = createMockEntity().copy(effectiveConnections = 5, supportsResume = true)
+            val info = RemoteFileInfo(2000, true, "etag", null, null, null)
+            coEvery { dataSource.probe(any(), any()) } returns info
+            coEvery { planner.plan(any(), any(), any(), 5) } returns
+                DownloadPlan(2000, emptyList(), null, true)
+            every { fileStore.lengthOf(any()) } returns 0
+            every { fileStore.usableSpaceFor(any()) } returns 10000
+
+            taskWithAdaptive.run(entity)
+
+            coVerify { planner.plan(any(), any(), any(), 5) }
         }
 
     private fun createMockEntity() =
