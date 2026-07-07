@@ -48,8 +48,8 @@ public data class DownloadManagerConfig(
         public const val DEFAULT_MIN_MULTI_CONNECTION_SIZE: Long = 5L * 1024 * 1024
         public const val DEFAULT_MIN_CONNECTIONS: Int = 1
         public val DEFAULT_PROGRESS_INTERVAL: Duration = 500.milliseconds
-        public val DEFAULT_CONNECT_TIMEOUT: Duration = 30.seconds
-        public val DEFAULT_READ_TIMEOUT: Duration = 30.seconds
+        public val DEFAULT_CONNECT_TIMEOUT: Duration = 10.seconds
+        public val DEFAULT_READ_TIMEOUT: Duration = 10.seconds
         public val DEFAULT_REEVALUATION_INTERVAL: Duration = 5.seconds
     }
 }
