@@ -5,10 +5,12 @@ import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.db.DownloadPartEntity
 import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
+import io.github.alirezajavan.downpour.internal.util.Logger
 
 internal class DownloadPlanner(
     private val repository: DownloadRepository,
     private val config: DownloadManagerConfig,
+    private val logger: Logger,
 ) {
     suspend fun plan(
         entity: DownloadEntity,
@@ -19,16 +21,36 @@ internal class DownloadPlanner(
         val ifRange = info.etag ?: info.lastModified
         val requestedConnections = if (activeConnections > 0) activeConnections else entity.maxConnections
 
-        if (!shouldUseMultiConnection(info, requestedConnections)) {
-            return singleConnectionPlan(info, ifRange, fileLength)
-        }
+        // A download that was ever multi-connection preallocates the destination file to its full
+        // size up front (see DownloadTask.execute), so fileLength no longer reflects how many bytes
+        // are actually on disk once that has happened -- only the per-part currentOffset rows do.
+        // Always prefer that persisted per-part state over fileLength when it exists, even if this
+        // attempt is dropping to 1 connection (e.g. the 429 concurrency downgrade): adjustConnections
+        // (scaleDown) correctly collapses it into fewer parts using each part's tracked offset,
+        // whereas falling through to singleConnectionPlan here would misread the preallocated file
+        // length as "already fully downloaded" and report a false completion.
         val resumed = resumePlanOrNull(entity, info, ifRange)
         if (resumed != null) {
-            if (activeConnections > 0 && resumed.parts.size != requestedConnections) {
-                return adjustConnections(entity, info, resumed.parts, requestedConnections)
+            val target = requestedConnections.coerceAtLeast(1)
+            logger.d(
+                "Planning ${entity.id}: resuming from ${resumed.parts.size} persisted part(s) " +
+                    "(fileLength=$fileLength, requestedConnections=$requestedConnections, target=$target)",
+            )
+            return if (resumed.parts.size != target) {
+                adjustConnections(entity, info, resumed.parts, target)
+            } else {
+                resumed
             }
-            return resumed
         }
+        if (!shouldUseMultiConnection(info, requestedConnections)) {
+            val canResume = info.acceptsRanges && ifRange != null && fileLength > 0
+            logger.d(
+                "Planning ${entity.id}: single-connection plan, no persisted parts " +
+                    "(fileLength=$fileLength, canResume=$canResume, acceptsRanges=${info.acceptsRanges})",
+            )
+            return singleConnectionPlan(info, ifRange, fileLength)
+        }
+        logger.d("Planning ${entity.id}: fresh multi-connection plan with $requestedConnections connections")
         return freshMultiConnectionPlan(entity, info, ifRange, requestedConnections)
     }
 
@@ -104,6 +126,7 @@ internal class DownloadPlanner(
         target: Int,
     ): DownloadPlan {
         val newParts = parts.sortedBy { it.startByte }.toMutableList()
+        val totalDownloadedBefore = parts.sumOf { (it.currentOffset - it.startByte).coerceAtLeast(0) }
         while (newParts.size > target && newParts.size > 1) {
             val last = newParts.removeAt(newParts.size - 1)
             val secondLast = newParts.removeAt(newParts.size - 1)
@@ -120,6 +143,12 @@ internal class DownloadPlanner(
                 )
             newParts.add(merged)
         }
+        val totalDownloadedAfter = newParts.sumOf { (it.currentOffset - it.startByte).coerceAtLeast(0) }
+        logger.d(
+            "Scaling down ${entity.id} from ${parts.size} to ${newParts.size} part(s): " +
+                "downloaded bytes $totalDownloadedBefore -> $totalDownloadedAfter " +
+                "(any drop means non-contiguous progress was discarded, not corrupted)",
+        )
 
         val reindexed =
             newParts.sortedBy { it.startByte }.mapIndexed { index, part ->

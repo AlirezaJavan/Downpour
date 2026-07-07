@@ -68,7 +68,8 @@ internal object ErrorCodec {
             }
 
             HTTP -> {
-                DownloadError.Http(httpCode ?: -1)
+                val code = httpCode ?: -1
+                if (message != null) DownloadError.Http(code, message = message) else DownloadError.Http(code)
             }
 
             INSUFFICIENT_STORAGE -> {

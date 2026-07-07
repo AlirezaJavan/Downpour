@@ -6,6 +6,7 @@ import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.db.DownloadPartEntity
 import io.github.alirezajavan.downpour.internal.network.RemoteFileInfo
+import io.github.alirezajavan.downpour.internal.util.NoOpLogger
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.Test
 class DownloadPlannerTest {
     private val repository = mockk<DownloadRepository>(relaxed = true)
     private val config = DownloadManagerConfig(minSizeForMultiConnection = 1000)
-    private val planner = DownloadPlanner(repository, config)
+    private val planner = DownloadPlanner(repository, config, NoOpLogger)
 
     @Test
     fun `plan returns single connection when file is small`() =
@@ -113,6 +114,36 @@ class DownloadPlannerTest {
             val plan = planner.plan(entity, info, 0, activeConnections = 2)
 
             assertThat(plan.parts).hasSize(2)
+        }
+
+    @Test
+    fun `plan collapses to 1 connection using persisted part progress, not the preallocated file length`() =
+        runTest {
+            // Regression test: a multi-connection download preallocates the destination file to its
+            // full size up front, so fileLength no longer reflects real progress once that happens.
+            // A 429 concurrency downgrade to 1 connection must resume from the persisted per-part
+            // offsets (via scaleDown), not misread the full preallocated fileLength as "done".
+            val entity = createMockEntity(maxConnections = 5).copy(etag = "etag")
+            val info = RemoteFileInfo(2000, true, "etag", null, null, null)
+
+            val parts =
+                listOf(
+                    DownloadPartEntity(1, "id", 0, 0, 499, 0),
+                    DownloadPartEntity(2, "id", 1, 500, 999, 700), // 200 bytes of real progress
+                    DownloadPartEntity(3, "id", 2, 1000, 1499, 1000),
+                    DownloadPartEntity(4, "id", 3, 1500, 1999, 1500),
+                )
+            coEvery { repository.getParts("id") } returns parts
+            coEvery { repository.replaceParts(any()) } returns Unit
+
+            // fileLength simulates the preallocated file: full size, even though almost nothing was
+            // actually written.
+            val plan = planner.plan(entity, info, fileLength = 2000, activeConnections = 1)
+
+            assertThat(plan.isMultiConnection).isTrue()
+            assertThat(plan.parts).hasSize(1)
+            // Progress must come from the persisted parts, not fileLength (2000, i.e. "fully done").
+            assertThat(plan.parts.single().downloaded).isLessThan(2000L)
         }
 
     private fun createMockEntity(maxConnections: Int) =

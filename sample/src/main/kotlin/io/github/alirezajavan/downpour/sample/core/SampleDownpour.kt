@@ -34,6 +34,7 @@ object SampleDownpour {
                 minConnections = settings.minConnections,
                 concurrencyReevaluationInterval = settings.reevaluationIntervalSeconds.seconds,
                 verbose = settings.verboseLogging,
+                preferIpv4 = settings.preferIpv4,
                 // Dynamic per-request auth headers, recomputed on every retry.
                 headerProvider = HeaderProvider { url -> mapOf("X-Sample-Token" to "demo-${url.hashCode().toUInt()}") },
                 // Post-processing hook -- runs after every completion.

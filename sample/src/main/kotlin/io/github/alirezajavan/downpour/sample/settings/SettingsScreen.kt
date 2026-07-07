@@ -69,7 +69,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
 
             item {
-                SettingsSection(title = "Adaptive concurrency (Phase 6)") {
+                SettingsSection(title = "Adaptive concurrency") {
                     LabeledSwitch(
                         label = "Enable adaptive tuning",
                         checked = settings.adaptiveConcurrency,
@@ -106,6 +106,23 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         label = "Verbose logging",
                         checked = settings.verboseLogging,
                         onCheckedChange = { viewModel.update { s -> s.copy(verboseLogging = it) } },
+                    )
+                }
+            }
+
+            item {
+                SettingsSection(title = "Networking") {
+                    LabeledSwitch(
+                        label = "Prefer IPv4",
+                        checked = settings.preferIpv4,
+                        onCheckedChange = { viewModel.update { s -> s.copy(preferIpv4 = it) } },
+                    )
+                    Text(
+                        "Forces IPv4-only DNS resolution. Enable this if downloads hang or time out on " +
+                            "networks with a broken or unreliable IPv6 path (connect attempts stalling for " +
+                            "the full connect timeout instead of failing fast).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

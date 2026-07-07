@@ -73,7 +73,7 @@ internal class DownloaderGraph private constructor(
 
     private val dataSource = HttpDownloadDataSource(httpClient, ioDispatcher, logger, config.headerProvider)
     private val fileStore = AndroidFileStore(appContext)
-    private val planner = DownloadPlanner(repository, config)
+    private val planner = DownloadPlanner(repository, config, logger)
     private val partDownloader = PartDownloader(dataSource, fileStore, logger)
     private val globalRateLimiter = RateLimiter(config.maxBytesPerSecond)
 

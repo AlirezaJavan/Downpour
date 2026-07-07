@@ -24,19 +24,32 @@ internal class PartDownloader(
         val resolved = resolveRange(context.part)
         logger.d("Starting part ${context.part.partId} for ${context.url} (Resolved Range: ${resolved.rangeStart}-${resolved.rangeEnd})")
         val response =
-            dataSource.open(
-                url = context.url,
-                headers = context.headers,
-                rangeStart = resolved.rangeStart,
-                rangeEnd = resolved.rangeEnd,
-                ifRange = context.ifRange,
-            )
+            try {
+                dataSource.open(
+                    url = context.url,
+                    headers = context.headers,
+                    rangeStart = resolved.rangeStart,
+                    rangeEnd = resolved.rangeEnd,
+                    ifRange = context.ifRange,
+                )
+            } catch (t: Throwable) {
+                logger.e("Part ${context.part.partId} failed to open connection for ${context.url}", t)
+                throw t
+            }
         // Close the response if this coroutine is cancelled, so a blocking socket read (or OkHttp's
         // own connection-retry loop) unblocks promptly on pause/cancel instead of waiting for a
         // timeout. dispose() removes the handler on the normal path.
         val cancelHandle = currentCoroutineContext().job.invokeOnCompletion { runCatching { response.close() } }
         try {
             response.use { writeBody(it, resolved, context) }
+            logger.d("Part ${context.part.partId} finished (last offset: ${context.partOffset.get()})")
+        } catch (t: Throwable) {
+            logger.e(
+                "Part ${context.part.partId} failed for ${context.url} " +
+                    "(bytes written this attempt: ${context.partOffset.get() - resolved.writePosition})",
+                t,
+            )
+            throw t
         } finally {
             cancelHandle.dispose()
         }
@@ -69,11 +82,24 @@ internal class PartDownloader(
         context: PartContext,
     ): ResolvedRange {
         if (resolved.rangeStart == null) {
-            if (!response.isSuccessful) throw response.toHttpError()
+            if (!response.isSuccessful) {
+                logger.w("Part ${context.part.partId} non-range request failed with ${response.code}")
+                throw response.toHttpError()
+            }
             return resolved
         }
         if (response.code == HTTP_PARTIAL) return resolved
-        if (!response.isSuccessful) throw response.toHttpError()
+        if (!response.isSuccessful) {
+            logger.w(
+                "Part ${context.part.partId} range request failed with ${response.code} " +
+                    "(Retry-After=${response.header("Retry-After")}, multiConnection=${context.isMultiConnection})",
+            )
+            throw response.toHttpError()
+        }
+        logger.w(
+            "Part ${context.part.partId} expected 206 but got ${response.code}: " +
+                "server stopped honoring range requests (multiConnection=${context.isMultiConnection})",
+        )
         if (context.isMultiConnection) {
             throw DownloadError.ContentValidation("Server stopped honoring range requests")
         }

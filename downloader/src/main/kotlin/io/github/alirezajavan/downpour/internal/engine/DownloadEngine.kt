@@ -38,11 +38,19 @@ internal class DownloadEngine(
     private val retryJobs = ConcurrentHashMap<String, Job>()
     private val tuningJobs = ConcurrentHashMap<String, Job>()
 
+    // Downloads the server has 429'd for concurrency. Adaptive tuning is never (re)started for
+    // these: a fresh ConnectionTuner always tries to *increase* connections on its first evaluation
+    // (see ConnectionTuner.decide), which has no memory of a 429 that just happened and would
+    // immediately re-trigger it -- fighting the downgrade in a loop that burns the retry budget.
+    // Once the server has said no to concurrency, we take it at its word for the rest of this
+    // download rather than re-probing.
+    private val rateLimitedDownloads = ConcurrentHashMap.newKeySet<String>()
+
     /**
      * Serializes every state transition. All status writes plus (de)registration of running jobs
      * and retry timers happen under this lock, so the user-facing operations (pause/resume/cancel/
      * retry/remove and their bulk/tag variants) can never interleave with the scheduler's
-     * [start]/[schedule]. This is what makes "I paused but it kept downloading" impossible: a pause
+     * [start]/[schedule]. This is what makes "I paused, but it kept downloading" impossible: a pause
      * either runs fully before a start (and the start then sees the row is no longer eligible) or
      * fully after it (and it finds the job in [activeJobs] and cancels it).
      *
@@ -125,6 +133,7 @@ internal class DownloadEngine(
             entities.forEach { entity ->
                 cancelRetry(entity.id)
                 cancelJob(entity.id)
+                clearRateLimited(entity.id)
                 discardArtifacts(entity)
             }
         }
@@ -140,6 +149,7 @@ internal class DownloadEngine(
             entities.forEach { entity ->
                 cancelRetry(entity.id)
                 cancelJob(entity.id)
+                clearRateLimited(entity.id)
                 if (deleteFiles) fileStore.delete(entity.toDestination())
             }
             repository.deleteByTag(tag)
@@ -174,6 +184,7 @@ internal class DownloadEngine(
             cancelRetry(id)
             repository.setStatus(id, DownloadStatus.CANCELLED)
             cancelJob(id)
+            clearRateLimited(id)
             discardArtifacts(entity)
         }
         schedule()
@@ -199,7 +210,7 @@ internal class DownloadEngine(
     suspend fun cancelAll() {
         scheduleMutex.withLock {
             cancelAllRetries()
-            // Snapshot the rows about to be cancelled so their on-disk artifacts can be discarded.
+            // Snapshot the rows about to be canceled so their on-disk artifacts can be discarded.
             val affected = repository.entitiesByStatuses(INTERRUPTIBLE_STATUSES)
             repository.setStatusIn(INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
             cancelActiveJobs()
@@ -215,6 +226,7 @@ internal class DownloadEngine(
         scheduleMutex.withLock {
             cancelRetry(id)
             cancelJob(id)
+            clearRateLimited(id)
             val entity = repository.getEntity(id)
             if (deleteFile) entity?.let { fileStore.delete(it.toDestination()) }
             repository.delete(id)
@@ -223,7 +235,10 @@ internal class DownloadEngine(
     }
 
     private fun cancelActiveJobs() {
-        activeJobs.keys.toList().forEach { cancelJob(it) }
+        activeJobs.keys.toList().forEach {
+            cancelJob(it)
+            clearRateLimited(it)
+        }
     }
 
     /**
@@ -232,10 +247,10 @@ internal class DownloadEngine(
      * Deliberately does NOT join the job. Joining here would deadlock — the task's completion path
      * ([onCompleted]/[onFailed]) re-acquires [scheduleMutex] — and would also stall every pause on
      * the in-flight socket read. Correctness instead comes from two guarantees that hold regardless
-     * of when the cancelled task finally unwinds:
+     * of when the canceled task finally unwinds:
      *  1. The caller has already written the new status (PAUSED/CANCELLED) under this lock, and the
      *     task only writes progress via [DownloadRepository.setRunningProgress], a no-op once the row
-     *     is not RUNNING — so it can never advance a paused/cancelled row.
+     *     is not RUNNING — so it can never advance a paused/canceled row.
      *  2. [onCompleted]/[onFailed] re-check the row is still RUNNING before doing anything, so a task
      *     that finishes just after cancellation cannot resurrect a terminal state.
      */
@@ -330,7 +345,7 @@ internal class DownloadEngine(
         }
         repository.setStatus(entity.id, DownloadStatus.RUNNING)
 
-        if (config.adaptiveConcurrency && entity.supportsResume) {
+        if (config.adaptiveConcurrency && entity.supportsResume && entity.id !in rateLimitedDownloads) {
             startAdaptiveTuning(entity.id, entity.maxConnections)
         }
 
@@ -388,6 +403,14 @@ internal class DownloadEngine(
         tuningJobs.remove(id)?.cancel()
     }
 
+    private fun markRateLimited(id: String) {
+        rateLimitedDownloads.add(id)
+    }
+
+    private fun clearRateLimited(id: String) {
+        rateLimitedDownloads.remove(id)
+    }
+
     private suspend fun runTask(entity: DownloadEntity) {
         when (val result = taskFactory().run(entity)) {
             is TaskResult.Completed -> onCompleted(entity, result)
@@ -418,6 +441,7 @@ internal class DownloadEngine(
                 true
             }
         if (!finalized) return
+        clearRateLimited(entity.id)
         logger.i("Download completed: ${entity.id}")
         runPostProcessing(entity)
     }
@@ -438,17 +462,60 @@ internal class DownloadEngine(
     ) {
         logger.e("Download failed: ${entity.id}. Error: ${error.message}", error)
         scheduleMutex.withLock {
-            // If the row is no longer RUNNING, the user paused/cancelled/removed it while the task
+            // If the row is no longer RUNNING, the user paused/canceled/removed it while the task
             // was unwinding. Honor that instead of recording an error or scheduling a retry.
             if (repository.getEntity(entity.id)?.status != DownloadStatus.RUNNING) return@withLock
             val attempt = entity.retryCount
-            if (error.isRetryable && attempt < entity.maxRetries) {
+            val effectiveError = downgradeConnectionsIfRateLimited(entity, error)
+            if (effectiveError.isRetryable && attempt < entity.maxRetries) {
                 logger.i("Retrying ${entity.id} (attempt ${attempt + 1}/${entity.maxRetries})")
-                scheduleRetry(entity, error, attempt + 1)
+                scheduleRetry(entity, effectiveError, attempt + 1)
             } else {
-                repository.setError(entity.id, error, attempt)
+                logger.w(
+                    "${entity.id} giving up permanently " +
+                        "(retryable=${effectiveError.isRetryable}, attempt=$attempt/${entity.maxRetries})",
+                )
+                repository.setError(entity.id, effectiveError, attempt)
             }
         }
+    }
+
+    /**
+     * A 429 while using more than one connection usually means the server is rate-limiting
+     * concurrent range requests rather than the download itself, so retrying with the same
+     * connection count would just loop into the same error. Drop this download to a single
+     * connection (persisted via [DownloadRepository.setEffectiveConnections], which the planner
+     * honors on the next attempt regardless of the adaptive-concurrency setting) and surface that
+     * decision through the error message so it reaches the UI via the normal Failed state.
+     */
+    private suspend fun downgradeConnectionsIfRateLimited(
+        entity: DownloadEntity,
+        error: DownloadError,
+    ): DownloadError {
+        if (error !is DownloadError.Http || error.statusCode != HTTP_TOO_MANY_REQUESTS) return error
+        val currentConnections =
+            if (entity.effectiveConnections > 0) entity.effectiveConnections else entity.maxConnections
+        markRateLimited(entity.id)
+        if (currentConnections <= 1) {
+            logger.w(
+                "${entity.id} got HTTP 429 while already at 1 connection; server is still rate-limiting " +
+                    "(Retry-After=${error.retryAfterSeconds}s). Will retry per backoff policy without further downgrade.",
+            )
+            return error
+        }
+
+        repository.setEffectiveConnections(entity.id, 1)
+        logger.i(
+            "Server rate-limited ${entity.id} with $currentConnections connections; " +
+                "reducing to 1 connection and retrying",
+        )
+        return DownloadError.Http(
+            statusCode = HTTP_TOO_MANY_REQUESTS,
+            retryAfterSeconds = error.retryAfterSeconds,
+            message =
+                "Server is rate-limiting concurrent connections (HTTP 429). " +
+                    "Reduced from $currentConnections to 1 connection and retrying.",
+        )
     }
 
     /**
@@ -464,9 +531,11 @@ internal class DownloadEngine(
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
                 repository.setError(entity.id, error, nextAttempt)
-                delay(backoffMillis(entity, nextAttempt, error).milliseconds)
+                val delayMillis = backoffMillis(entity, nextAttempt, error)
+                logger.d("Backoff for ${entity.id} before attempt $nextAttempt: ${delayMillis}ms")
+                delay(delayMillis.milliseconds)
                 scheduleMutex.withLock {
-                    // Re-queue only if still FAILED (not paused/cancelled/removed meanwhile).
+                    // Re-queue only if still FAILED (not paused/canceled/removed meanwhile).
                     if (repository.getEntity(entity.id)?.status == DownloadStatus.FAILED) {
                         repository.setStatus(entity.id, DownloadStatus.QUEUED)
                     }
@@ -503,6 +572,7 @@ internal class DownloadEngine(
     private companion object {
         const val QUEUE_SCAN_LIMIT = 256
         const val MAX_PARTS = 16
+        const val HTTP_TOO_MANY_REQUESTS = 429
         val ACTIVE_STATUSES =
             listOf(DownloadStatus.QUEUED, DownloadStatus.RUNNING, DownloadStatus.WAITING_FOR_NETWORK)
         val INTERRUPTIBLE_STATUSES =
