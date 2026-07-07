@@ -10,6 +10,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Disk Space Pre-flight**: Added check in `DownloadTask` to verify available bytes.
 *   **[x] File Conflict Policies**: `ConflictStrategy` (`Overwrite`, `Rename`, `Fail`) added to `DownloadRequest` and handled.
 *   **[x] Scoped Storage Bridge**: `DownloadDestination` (File vs Uri) implemented to support `MediaStore` and `ContentResolver`.
+*   **[x] Sample app**: `ConflictStrategy` is a segmented-button toggle in the New Download sheet (Overwrite/Rename/Fail) — re-enqueuing the same URL exercises a real collision. **Remaining**: a `DownloadDestination.Uri`/MediaStore example isn't wired up yet (form only builds `File` destinations). Disk-space pre-flight has no separate UI surface — skip it.
 
 ## Phase 2: Network Intelligence & Performance
 *Focus: Efficiency and data-saving features.*
@@ -17,6 +18,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Metadata Probing**: Refactored engine to use `HEAD` requests and parse content metadata.
 *   **[x] Metered Network Handling**: Added `WAITING_FOR_NETWORK` state and automated pause/resume based on `NetworkType` constraints.
 *   **[x] Global Rate Limiting**: Throttling mechanism implemented and configurable.
+*   **[x] Sample app**: `NetworkType` is a segmented-button toggle in the New Download sheet, and the global bandwidth cap is a Settings slider. **Remaining**: no per-download `maxBytesPerSecond` field in the form yet (global cap only).
 
 ## Phase 3: Enhanced UX & Notifications
 *Focus: Deep integration with the Android System.*
@@ -24,6 +26,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Interactive Notifications**: Added Pause, Resume, and Cancel buttons to notifications.
 *   **[x] MIME Type Detection**: `FilenameResolver` resolves extensions from `Content-Type` and `Content-Disposition`.
 *   **[x] FileProvider Integration**: Standard `Downpour.getFileUri` provided for opening files securely.
+*   **[x] Sample app**: Downloads screen shows an "Open" action on completed items using `Downpour.getFileUri(...)`. Interactive notifications and MIME detection are already observable via the real notification tray/filename once any download runs.
 
 ## Phase 4: Developer Experience (DX) & Extensibility
 *Focus: Making the library a joy to use.*
@@ -31,6 +34,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Request Interceptors**: `DownloadInterceptor` interface for global header injection and logging.
 *   **[x] Post-Processing Workers**: `DownloadWorker` system for tasks like unzipping or decryption after completion.
 *   **[x] Jetpack Compose Artifact**: Added `DownloadItemCard` and Compose dependencies.
+*   **[x] Sample app**: `SampleDownpour` wires a `HeaderProvider` (fake token), a `DownloadPostProcessor`, and a `DownloadListener` — each surfaces a Snackbar via a small event bus so the hooks are visibly exercised, not just present in config. The Downloads screen uses the real `DownloadItemCard`.
 
 ## Phase 5: Management & Advanced Control
 *Focus: Professional-grade management features.*
@@ -38,6 +42,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Tag-based Batching**: Added `pauseByTag`, `cancelByTag`, and `removeByTag` for grouped management.
 *   **[x] Diagnostic Export**: `getDiagnosticReport(id)` returns detailed logs, error history, and connection metadata.
 *   **[x] Dynamic Concurrency**: `DownloadPlanner` supports dynamic connection count; `DownloadTask` placeholder implemented.
+*   **[x] Sample app**: added the Tags & Groups screen (`pauseByTag`/`resumeByTag`/`cancelByTag`/`removeByTag`, `observeByTag`, `observeGroupProgress`) and a Diagnostics screen (`getDiagnosticReport(id)` per item, refreshable). Dynamic concurrency has no standalone UI — it's covered by Phase 6's own sample step below.
 
 ---
 
@@ -57,6 +62,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Config additions**: `DownloadManagerConfig.adaptiveConcurrency: Boolean = false` (opt-in, off by default so existing behavior is unchanged unless requested), `minConnections`, `concurrencyReevaluationInterval`.
 *   **[x] Tests**: extend `DownloadPlannerTest.kt` and `DownloadEngineTest.kt` with a fake clock/speed source to verify scale-up, scale-down, and plateau behavior deterministically (no real network timing in unit tests).
 *   **[x] Acceptance**: a download on a simulated variable-bandwidth `HttpDownloadDataSource` fake converges to a stable connection count within the reevaluation window and never exceeds `maxConnections` or drops below `minConnections`.
+*   **[x] Sample app**: added an `adaptiveConcurrency` toggle plus `minConnections`/re-evaluation-interval sliders to the Settings screen. Since `Downpour.getInstance` is a process-wide singleton that ignores later config changes, "Apply & restart" persists the settings and relaunches the process rather than pretending a live rebuild is possible. **Remaining**: no per-item live effective-connection-count readout (would need a new field on `DiagnosticReport`/`DownloadItem`, out of scope for a sample-app-only change).
 
 ---
 
@@ -72,6 +78,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **Interaction with existing constraints**: schedule window is ANDed with `NetworkType`/`requiresCharging`/etc — all must be satisfied simultaneously, consistent with how those are combined today.
 *   **Tests**: `DownloadEngineStateTest.kt` — inject a fake clock, verify a download outside its window stays `Scheduled` and transitions to `Queued`/`Running` exactly at window start; verify a download already `Running` when its window closes pauses gracefully (same path as a lost network constraint).
 *   **Acceptance**: `README.md` "Network & device constraints" section gets a matching example.
+*   **[ ] Sample app**: add a time-window picker to the Constraints screen (Phase 11) so a request can be built with `scheduleWindow(...)`, and show the `Scheduled` state distinctly in the Downloads list.
 
 ---
 
@@ -90,6 +97,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **Where**: `internal/DefaultDownloadManager.kt` (`enqueue`), `internal/data/DownloadRepository.kt` (add a lookup by URL+destination or checksum).
 *   **What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
 *   **Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
+*   **[ ] Sample app**: add Export/Import buttons (Settings screen, Phase 11) that call `exportQueue()`/`importQueue(...)` against a file in app-private storage, and enqueue the same URL twice from the UI to demonstrate `DuplicatePolicy.REUSE_EXISTING` returning the same id.
 
 ---
 
@@ -100,6 +108,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[ ] Detekt**: add `io.gitlab.arturbosch.detekt` alongside existing Spotless/ktlint in `build.gradle.kts`, with a baseline generated from current code so it doesn't block on pre-existing style. Wire into the same CI workflow as `android.yml`.
 *   **[ ] Instrumented tests**: add `downloader/src/androidTest` covering `DownloadService` foreground behavior and notification action `PendingIntent`s (Pause/Resume/Cancel actually reaching `DownloadManager`), which Robolectric can't fully exercise. Use `androidx.test.uiautomator` or `ServiceTestRule`.
 *   **[ ] CI**: publish snapshot builds (`-SNAPSHOT` version) to a snapshot repo on every merge to `master`, separate from the tagged Maven Central release flow.
+*   **[ ] Sample app**: not needed — this phase is internal tooling/CI with no library-facing API surface to showcase.
 
 ---
 
@@ -110,6 +119,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **Where**: new `compose/DiagnosticsScreen.kt` alongside the existing `compose/DownloadItemCard.kt`.
 *   **What**: A Compose screen listing retry history, last error, resume-support flag, and connection-level part progress (start/end/downloaded per `PartPlan`, surfaced through a new field on `DiagnosticReport` if not already exposed — check `api/DiagnosticReport.kt` first, extend rather than duplicate).
 *   **Tests**: `DiagnosticReportTest.kt` extended for any new fields; Compose screen gets a Paparazzi/Compose UI test if the project already has that infra (check before adding a new test framework).
+*   **[ ] Sample app**: this phase's `DiagnosticsScreen` *is* the sample-app deliverable — wire it into the Diagnostics destination added in Phase 5's sample step, replacing the plain `getDiagnosticReport` text dump.
 
 ---
 
