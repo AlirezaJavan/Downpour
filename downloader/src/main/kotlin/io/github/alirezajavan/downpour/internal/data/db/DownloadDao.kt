@@ -171,6 +171,13 @@ internal interface DownloadDao {
         now: Long,
     )
 
+    @Query("UPDATE downloads SET effectiveConnections = :connections, updatedAtMillis = :now WHERE id = :id")
+    suspend fun updateEffectiveConnections(
+        id: String,
+        connections: Int,
+        now: Long,
+    )
+
     @Query("DELETE FROM downloads WHERE status = :completed AND updatedAtMillis < :cutoff")
     suspend fun deleteCompletedBefore(
         completed: DownloadStatus,

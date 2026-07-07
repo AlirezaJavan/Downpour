@@ -27,6 +27,7 @@ internal data class DownloadEntity(
     val requiresBatteryNotLow: Boolean = false,
     val requiresStorageNotLow: Boolean = false,
     val maxConnections: Int,
+    val effectiveConnections: Int = -1,
     val maxBytesPerSecond: Long,
     val checksumAlgorithm: Int?,
     val checksumValue: String?,

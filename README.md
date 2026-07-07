@@ -42,7 +42,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 
 ## Requirements
 
-- **minSdk 23** (Android 6.0), **compileSdk 37**
+- **minSdk 24** (Android 7.0), **compileSdk 37**
 - **JDK 17+**
 
 ## Installation
@@ -50,7 +50,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.alirezajavan:downpour:0.2.0")
+    implementation("io.github.alirezajavan:downpour:0.3.0")
 }
 ```
 

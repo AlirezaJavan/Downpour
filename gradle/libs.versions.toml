@@ -14,6 +14,7 @@ serialization = "1.11.0"
 # Sample app
 activityCompose = "1.13.0"
 composeBom = "2026.06.00"
+navigationCompose = "2.9.8"
 
 # Test
 junit5 = "6.1.0"
@@ -50,6 +51,8 @@ compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 # Test
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }

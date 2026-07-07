@@ -78,7 +78,16 @@ internal class HttpDownloadDataSource(
                     ifRange?.let { header(HEADER_IF_RANGE, it) }
                 }
             }
-        return execute(request)
+        val response = execute(request)
+        if (!response.isSuccessful) {
+            logger.w(
+                "Non-2xx response opening $url (Range: $rangeStart-$rangeEnd): " +
+                    "${response.code} ${response.message}, Retry-After=${response.header("Retry-After")}",
+            )
+        } else {
+            logger.d("Opened $url with status ${response.code} (Range: $rangeStart-$rangeEnd)")
+        }
+        return response
     }
 
     private fun execute(request: Request): Response =

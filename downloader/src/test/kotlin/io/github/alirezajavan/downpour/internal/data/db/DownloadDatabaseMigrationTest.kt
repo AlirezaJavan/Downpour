@@ -53,6 +53,18 @@ class DownloadDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `migration 5 to 6 adds effectiveConnections defaulting to -1`() {
+        db.execSQL("INSERT INTO downloads (id, createdAtMillis) VALUES ('a', 123)")
+
+        DownloadDatabase.MIGRATION_5_6.migrate(db)
+
+        db.query("SELECT effectiveConnections FROM downloads WHERE id = 'a'").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.getInt(0)).isEqualTo(-1)
+        }
+    }
+
     private companion object {
         const val VERSION_4 = 4
     }

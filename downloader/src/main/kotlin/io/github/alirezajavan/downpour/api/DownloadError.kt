@@ -15,15 +15,14 @@ public sealed class DownloadError(
     public class Http(
         public val statusCode: Int,
         public val retryAfterSeconds: Long? = null,
-    ) : DownloadError("Unexpected HTTP status code: $statusCode", null)
+        message: String = "Unexpected HTTP status code: $statusCode",
+    ) : DownloadError(message, null)
 
     public class InsufficientStorage(
         requiredBytes: Long,
         availableBytes: Long,
-    ) : DownloadError(
-            "Not enough free space: required=$requiredBytes available=$availableBytes",
-            null,
-        )
+        message: String = "Not enough free space: required=$requiredBytes available=$availableBytes",
+    ) : DownloadError(message, null)
 
     public class FileAlreadyExists(
         filePath: String,

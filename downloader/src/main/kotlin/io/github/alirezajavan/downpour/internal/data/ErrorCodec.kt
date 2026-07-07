@@ -68,11 +68,16 @@ internal object ErrorCodec {
             }
 
             HTTP -> {
-                DownloadError.Http(httpCode ?: -1)
+                val code = httpCode ?: -1
+                if (message != null) DownloadError.Http(code, message = message) else DownloadError.Http(code)
             }
 
             INSUFFICIENT_STORAGE -> {
-                DownloadError.Storage(message ?: "Insufficient storage", null)
+                // requiredBytes/availableBytes aren't persisted, only the formatted message; the real
+                // values only matter for the in-memory error that triggered the retry decision. What
+                // must survive the round-trip is isRetryable, which depends on the type being
+                // InsufficientStorage (retryable) and not Storage (not retryable) -- see DownloadError.isRetryable.
+                DownloadError.InsufficientStorage(0, 0, message ?: "Insufficient storage")
             }
 
             STORAGE -> {

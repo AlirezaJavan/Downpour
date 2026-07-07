@@ -76,6 +76,10 @@ internal class DownloadTask(
         fileStore.ensureParentExists(currentDestination)
 
         val activeConnections = calculateDynamicConnections(entity)
+        logger.d(
+            "Connections for ${entity.id}: $activeConnections " +
+                "(effectiveConnections=${entity.effectiveConnections}, maxConnections=${entity.maxConnections})",
+        )
         val plan = planner.plan(currentEntity, info, fileStore.lengthOf(currentDestination), activeConnections)
         logger.d("Download plan for ${entity.id}: $plan")
 
@@ -305,7 +309,12 @@ internal class DownloadTask(
     }
 
     private fun calculateDynamicConnections(entity: DownloadEntity): Int {
-        // Dynamic concurrency placeholder - currently returns entity max
+        // effectiveConnections is an override for this specific download -- set either by the
+        // adaptive tuner or by the rate-limit safeguard in DownloadEngine -- so it applies
+        // regardless of whether adaptive concurrency tuning itself is enabled.
+        if (entity.effectiveConnections > 0) {
+            return entity.effectiveConnections
+        }
         return entity.maxConnections
     }
 
