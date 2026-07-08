@@ -130,17 +130,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Downpour builds its engine once per process, so these settings only take " +
-                            "effect on the next launch.",
+                        "Rebuilds the download engine in place. Any in-flight downloads are " +
+                            "requeued and resume automatically under the new settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(
-                        onClick = { viewModel.applyAndRestart(context) },
+                        onClick = { viewModel.apply(context) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Filled.RestartAlt, contentDescription = null)
-                        Text(" Apply & restart")
+                        Text(" Apply")
                     }
                 }
             }

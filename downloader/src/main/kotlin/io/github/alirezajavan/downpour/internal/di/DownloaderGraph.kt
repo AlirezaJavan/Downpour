@@ -30,6 +30,7 @@ import io.github.alirezajavan.downpour.internal.util.DownloadLoggerAdapter
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import okhttp3.OkHttpClient
@@ -154,6 +155,20 @@ internal class DownloaderGraph private constructor(
         scope.launch { engine.recover() }
     }
 
+    /**
+     * Tears this graph down: cancelling [scope] stops every in-flight part job and, via
+     * `awaitClose`, unregisters the network/battery callbacks those jobs were collecting.
+     * In-flight downloads aren't lost -- their bytes are flushed to disk per chunk, and rows left
+     * in [io.github.alirezajavan.downpour.internal.data.DownloadStatus.RUNNING] are requeued by the
+     * next graph's `engine.recover()`.
+     */
+    private fun shutdown() {
+        scope.cancel()
+        httpClient.dispatcher.executorService.shutdown()
+        httpClient.connectionPool.evictAll()
+        database.close()
+    }
+
     companion object {
         @Volatile
         private var instance: DownloaderGraph? = null
@@ -164,14 +179,21 @@ internal class DownloaderGraph private constructor(
         ): DownloaderGraph {
             val current = instance
             if (current != null) {
-                // If config changed, we might need to update internal state.
-                // For simplicity in this fix, we just return the existing instance,
-                // but in a real app, you should kill the process or handle dynamic config.
                 return current
             }
             return synchronized(this) {
                 instance ?: DownloaderGraph(context, config).also { instance = it }
             }
         }
+
+        /** Shuts down the current instance (if any) and replaces it with one built from [config]. */
+        fun reconfigure(
+            context: Context,
+            config: DownloadManagerConfig,
+        ): DownloaderGraph =
+            synchronized(this) {
+                instance?.shutdown()
+                DownloaderGraph(context, config).also { instance = it }
+            }
     }
 }

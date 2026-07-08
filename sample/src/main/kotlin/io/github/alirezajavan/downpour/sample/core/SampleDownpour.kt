@@ -11,9 +11,10 @@ import io.github.alirezajavan.downpour.api.HeaderProvider
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Single shared [DownloadManager] for the whole sample app, built once from the persisted
+ * Single shared [DownloadManager] for the whole sample app, built from the persisted
  * [SampleSettings] and wired with a visible example of every Phase 4 extension hook so they're
- * exercised just by using the app rather than only from unit tests.
+ * exercised just by using the app rather than only from unit tests. Rebuilt in place (no process
+ * restart) whenever [applySettings] is called.
  */
 object SampleDownpour {
     @Volatile
@@ -21,11 +22,28 @@ object SampleDownpour {
 
     fun getInstance(context: Context): DownloadManager =
         manager ?: synchronized(this) {
-            manager ?: buildManager(context).also { manager = it }
+            manager ?: buildManager(context, SampleSettingsStore(context).load()).also { manager = it }
         }
 
-    private fun buildManager(context: Context): DownloadManager {
-        val settings = SampleSettingsStore(context).load()
+    /**
+     * Rebuilds the manager from [settings] in place -- callers that call [getInstance] again (e.g.
+     * a screen recreated by navigating away and back) see the new one immediately, no process
+     * restart required. Screens already holding the old reference keep using the shut-down engine
+     * until they re-fetch.
+     */
+    fun applySettings(
+        context: Context,
+        settings: SampleSettings,
+    ): DownloadManager =
+        synchronized(this) {
+            buildManager(context, settings, reconfigure = true).also { manager = it }
+        }
+
+    private fun buildManager(
+        context: Context,
+        settings: SampleSettings,
+        reconfigure: Boolean = false,
+    ): DownloadManager {
         val config =
             DownloadManagerConfig(
                 maxConcurrentDownloads = settings.maxConcurrentDownloads,
@@ -52,7 +70,7 @@ object SampleDownpour {
                         },
                     ),
             )
-        return Downpour.getInstance(context, config)
+        return if (reconfigure) Downpour.reconfigure(context, config) else Downpour.getInstance(context, config)
     }
 
     private const val BYTES_PER_MB = 1024L * 1024L

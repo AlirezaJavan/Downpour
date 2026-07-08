@@ -15,9 +15,9 @@ data class SampleSettings(
 )
 
 /**
- * [Downpour.getInstance] builds its engine once per process and ignores later config changes, so
- * these values only take effect on the next process start. The Settings screen makes this explicit
- * via an "Apply & Restart" action instead of pretending a live rebuild is possible.
+ * The Settings screen's "Apply" action pushes these values into a live rebuild of the shared
+ * [io.github.alirezajavan.downpour.api.DownloadManager] via [SampleDownpour.applySettings] and
+ * [Downpour.reconfigure] -- no process restart needed.
  */
 class SampleSettingsStore(
     context: Context,
@@ -36,9 +36,8 @@ class SampleSettingsStore(
         )
 
     fun save(settings: SampleSettings) {
-        // commit() (not apply()) so the write lands on disk synchronously: applyAndRestart()
-        // kills the process right after this call via Runtime.exit(), which would otherwise race
-        // apply()'s async flush and could restart into stale (default) settings.
+        // commit() (not apply()) so the write lands on disk synchronously before the engine
+        // rebuild that immediately follows reads it back via load().
         prefs.edit(commit = true) {
             putInt(KEY_MAX_CONCURRENT, settings.maxConcurrentDownloads)
             putInt(KEY_BANDWIDTH_CAP, settings.globalBandwidthCapMbps)
