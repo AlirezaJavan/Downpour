@@ -102,7 +102,7 @@ downloadManager.observe(id).collect { item ->
 
 ## Core Concepts
 
-- **`DownloadManager`** — the single entry point. Returned by `Downpour.getInstance(context, config)`.
+- **`DownloadManager`** — the single entry point. Returned by `Downpour.getInstance(context, config)`. Call `Downpour.reconfigure(context, config)` to rebuild the engine in place with a new config (e.g. after a settings change) — in-flight downloads are requeued and resumed by the new engine, no process restart required.
 - **`DownloadRequest`** — an immutable description of *what* to download and *how*, built with the `downloadRequest { }` DSL.
 - **`DownloadItem`** — a snapshot of a download (id, url, destination, `state`, tag, metadata, timestamps).
 - **`DownloadState`** — a sealed type: `Queued`, `Running`, `Paused`, `Completed`, `Failed`, `WaitingForNetwork`, `Cancelled`.

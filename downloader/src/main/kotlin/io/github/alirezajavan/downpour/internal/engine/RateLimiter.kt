@@ -24,11 +24,15 @@ internal class RateLimiter(
 
     private fun reserve(bytes: Int): Long {
         refill()
+        // Deliberately left negative (not clamped to 0) when it goes into deficit: clamping would
+        // forgive debt run up by concurrent callers (multiple parts sharing this limiter) between
+        // this reservation and the delay it prescribes, letting aggregate throughput exceed the cap
+        // by roughly the connection count. Leaving the true debt in place means the next refill has
+        // to pay it off before granting anyone new tokens, so the cap holds regardless of how many
+        // callers are reserving concurrently.
         availableTokens -= bytes
         if (availableTokens >= 0) return 0
-        val deficit = -availableTokens
-        availableTokens = 0.0
-        return (deficit / bytesPerSecond * MILLIS_PER_SECOND).toLong()
+        return (-availableTokens / bytesPerSecond * MILLIS_PER_SECOND).toLong()
     }
 
     private fun refill() {
