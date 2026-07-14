@@ -52,12 +52,6 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).addMigrations(
-                DownloadDatabase.MIGRATION_3_4,
-                DownloadDatabase.MIGRATION_4_5,
-                DownloadDatabase.MIGRATION_5_6,
-                DownloadDatabase.MIGRATION_6_7,
-                DownloadDatabase.MIGRATION_7_8,
             ).fallbackToDestructiveMigration(false)
             .build()
 
@@ -110,8 +104,13 @@ internal class DownloaderGraph private constructor(
     private val scheduler =
         object : io.github.alirezajavan.downpour.internal.engine.DownloadScheduler {
             override fun schedule(delayMillis: Long) {
-                io.github.alirezajavan.downpour.internal.work.DownloadRecoveryWorker
-                    .schedule(appContext, delayMillis)
+                if (delayMillis == 0L) {
+                    io.github.alirezajavan.downpour.internal.work.DownloadRecoveryWorker
+                        .schedule(appContext)
+                } else {
+                    io.github.alirezajavan.downpour.internal.work.DownloadWakeupReceiver
+                        .schedule(appContext, delayMillis)
+                }
             }
         }
 

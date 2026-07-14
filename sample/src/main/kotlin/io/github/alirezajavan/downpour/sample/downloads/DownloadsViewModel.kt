@@ -47,16 +47,9 @@ class DownloadsViewModel(
                     .takeIf { it.isNotEmpty() }
                     ?.let { mirror(it) }
 
-                if (form.schedule.hasWindow) {
-                    scheduleWindow(
-                        form.schedule.scheduleStartMinuteOfDay!! / 60,
-                        form.schedule.scheduleStartMinuteOfDay!! % 60,
-                        form.schedule.scheduleEndMinuteOfDay!! / 60,
-                        form.schedule.scheduleEndMinuteOfDay!! % 60,
-                    )
+                form.schedule.startTimeMillis?.let { start ->
+                    schedule(start, form.schedule.endTimeMillis)
                 }
-
-                form.schedule.scheduledAtMillis?.let { scheduleAt(it) }
             },
         )
         SampleEvents.emit("Queued • ${form.fileName()}")

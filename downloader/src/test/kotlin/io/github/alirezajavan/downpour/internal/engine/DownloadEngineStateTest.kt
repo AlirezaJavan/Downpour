@@ -340,48 +340,21 @@ class DownloadEngineStateTest {
         }
 
     @Test
-    fun `scheduleWindow keeps a download scheduled until the time window starts`() =
+    fun `schedule keeps a download scheduled until the time window starts`() =
         runTest(UnconfinedTestDispatcher()) {
-            // Window is 2 AM to 6 AM (120 to 360 minutes)
+            val startTime = NOW + 10_000
+            val endTime = NOW + 20_000
             val entity =
                 entity("a").copy(
                     schedule =
                         DownloadSchedule(
-                            scheduleStartMinuteOfDay = 120,
-                            scheduleEndMinuteOfDay = 360,
+                            startTimeMillis = startTime,
+                            endTimeMillis = endTime,
                         ),
                 )
             repository.insert(entity)
 
-            // Current time is 1 AM (60 minutes)
-            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 60)
-            val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
-
-            engine.onEnqueued()
-            advanceUntilIdle()
-            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
-
-            // Current time is 3 AM (180 minutes)
-            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 180)
-            engine.onEnqueued()
-            advanceUntilIdle()
-            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
-
-            // Current time is 7 AM (420 minutes)
-            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 420)
-            engine.onEnqueued()
-            advanceUntilIdle()
-            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
-        }
-
-    @Test
-    fun `scheduleAt keeps a download scheduled until the specific timestamp is reached`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val scheduledTime = NOW + 10_000
-            val entity = entity("a").copy(schedule = DownloadSchedule(scheduledAtMillis = scheduledTime))
-            repository.insert(entity)
-
-            // Current time is NOW
+            // Current time is NOW (before start)
             every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = NOW)
             val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
 
@@ -389,11 +362,17 @@ class DownloadEngineStateTest {
             advanceUntilIdle()
             assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
 
-            // Current time is after scheduledTime
-            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = scheduledTime + 1)
+            // Current time is between start and end
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = startTime + 1)
             engine.onEnqueued()
             advanceUntilIdle()
             assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+
+            // Current time is after end
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = endTime + 1)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
         }
 
     private fun entity(
@@ -493,7 +472,6 @@ class DownloadEngineStateTest {
                 isCharging = false,
                 isBatteryLow = false,
                 isStorageLow = false,
-                currentTimeMinuteOfDay = 0,
                 currentTimeMillis = NOW,
             )
     }

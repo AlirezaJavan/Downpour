@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.Calendar
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
@@ -343,14 +342,15 @@ internal class DownloadEngine(
         }
 
     private suspend fun scheduleNextWakeup() {
-        val scheduled = repository.entitiesByStatuses(listOf(DownloadStatus.SCHEDULED))
-        if (scheduled.isEmpty()) return
+        val statuses = listOf(DownloadStatus.SCHEDULED, DownloadStatus.RUNNING)
+        val entities = repository.entitiesByStatuses(statuses)
+        if (entities.isEmpty()) return
 
         val now = System.currentTimeMillis()
         val nextDelayMillis =
-            scheduled.minOf { entity ->
+            entities.minOf { entity ->
                 val targetTime = calculateTargetTime(entity.schedule, now)
-                (targetTime - now).coerceAtLeast(0)
+                if (targetTime == Long.MAX_VALUE) Long.MAX_VALUE else (targetTime - now).coerceAtLeast(0)
             }
 
         if (nextDelayMillis > 0 && nextDelayMillis != Long.MAX_VALUE) {
@@ -363,34 +363,13 @@ internal class DownloadEngine(
         schedule: DownloadSchedule,
         now: Long,
     ): Long {
-        val dateTarget = schedule.scheduledAtMillis ?: now
-        val calendar = Calendar.getInstance().apply { timeInMillis = dateTarget }
-        val minuteAtDateTarget = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        val start = schedule.startTimeMillis
+        if (start != null && start > now) return start
 
-        val start = schedule.scheduleStartMinuteOfDay ?: return dateTarget
-        val end = schedule.scheduleEndMinuteOfDay ?: return dateTarget
+        val end = schedule.endTimeMillis
+        if (end != null && end > now) return end
 
-        // Is minuteAtDateTarget in window [start, end)?
-        val inWindow =
-            if (start < end) {
-                minuteAtDateTarget in start until end
-            } else {
-                // Window crosses midnight
-                minuteAtDateTarget !in end..<start
-            }
-
-        if (inWindow && dateTarget >= now) return dateTarget
-
-        // Not in window or target was in the past (which should have started already).
-        // Find the FIRST window start time that is >= dateTarget.
-        val diffMinutes =
-            if (start >= minuteAtDateTarget) {
-                start - minuteAtDateTarget
-            } else {
-                (1440 - minuteAtDateTarget) + start
-            }
-
-        return dateTarget + diffMinutes * 60 * 1000L
+        return Long.MAX_VALUE
     }
 
     private suspend fun startEligible(slots: Int) {
@@ -418,18 +397,13 @@ internal class DownloadEngine(
 
     private fun DeviceState.isTimeRestricted(entity: DownloadEntity): Boolean {
         val schedule = entity.schedule
-        if (schedule.scheduledAtMillis != null && currentTimeMillis < schedule.scheduledAtMillis) {
+        if (schedule.startTimeMillis != null && currentTimeMillis < schedule.startTimeMillis) {
             return true
         }
-
-        val start = schedule.scheduleStartMinuteOfDay ?: return false
-        val end = schedule.scheduleEndMinuteOfDay ?: return false
-
-        return if (start < end) {
-            currentTimeMinuteOfDay !in start until end
-        } else {
-            currentTimeMinuteOfDay in end..<start
+        if (schedule.endTimeMillis != null && currentTimeMillis >= schedule.endTimeMillis) {
+            return true
         }
+        return false
     }
 
     /**

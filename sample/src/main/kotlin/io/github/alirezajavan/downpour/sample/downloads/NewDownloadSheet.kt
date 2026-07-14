@@ -224,51 +224,25 @@ fun NewDownloadSheet(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Section(title = "Scheduling Window") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TimeInput(
-                            label = "Start",
-                            hour = form.schedule.scheduleStartMinuteOfDay?.let { it / 60 },
-                            minute = form.schedule.scheduleStartMinuteOfDay?.let { it % 60 },
-                            onTimeChange = { h, m ->
-                                val minuteOfDay = if (h != null && m != null) h * 60 + m else null
-                                form =
-                                    form.copy(
-                                        schedule = form.schedule.copy(scheduleStartMinuteOfDay = minuteOfDay),
-                                    )
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        TimeInput(
-                            label = "End",
-                            hour = form.schedule.scheduleEndMinuteOfDay?.let { it / 60 },
-                            minute = form.schedule.scheduleEndMinuteOfDay?.let { it % 60 },
-                            onTimeChange = { h, m ->
-                                val minuteOfDay = if (h != null && m != null) h * 60 + m else null
-                                form =
-                                    form.copy(
-                                        schedule = form.schedule.copy(scheduleEndMinuteOfDay = minuteOfDay),
-                                    )
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                Section(title = "Schedule") {
+                    DatePickerInput(
+                        label = "Start at",
+                        selectedTimestamp = form.schedule.startTimeMillis,
+                        onTimestampChange = {
+                            form = form.copy(schedule = form.schedule.copy(startTimeMillis = it))
+                        },
+                    )
+                    DatePickerInput(
+                        label = "Stop at",
+                        selectedTimestamp = form.schedule.endTimeMillis,
+                        onTimestampChange = {
+                            form = form.copy(schedule = form.schedule.copy(endTimeMillis = it))
+                        },
+                    )
                     Text(
-                        "Leave empty to start immediately. Supports midnight-crossing.",
+                        "Leave empty to start immediately. Stop time is optional.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Section(title = "Schedule Start Date") {
-                    DatePickerInput(
-                        selectedTimestamp = form.schedule.scheduledAtMillis,
-                        onTimestampChange = {
-                            form = form.copy(schedule = form.schedule.copy(scheduledAtMillis = it))
-                        },
                     )
                 }
             }
@@ -285,6 +259,7 @@ fun NewDownloadSheet(
 
 @Composable
 private fun DatePickerInput(
+    label: String,
     selectedTimestamp: Long?,
     onTimestampChange: (Long?) -> Unit,
 ) {
@@ -292,7 +267,7 @@ private fun DatePickerInput(
     val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
     val text by remember(selectedTimestamp) {
         derivedStateOf {
-            selectedTimestamp?.let { formatter.format(Date(it)) } ?: "Not scheduled"
+            selectedTimestamp?.let { formatter.format(Date(it)) } ?: "Not set"
         }
     }
 
@@ -306,7 +281,7 @@ private fun DatePickerInput(
             onValueChange = {},
             readOnly = true,
             modifier = Modifier.weight(1f),
-            label = { Text("Start at") },
+            label = { Text(label) },
         )
         TextButton(onClick = {
             val now = Calendar.getInstance()
@@ -338,44 +313,6 @@ private fun DatePickerInput(
             TextButton(onClick = { onTimestampChange(null) }) {
                 Text("Clear")
             }
-        }
-    }
-}
-
-@Composable
-private fun TimeInput(
-    label: String,
-    hour: Int?,
-    minute: Int?,
-    onTimeChange: (Int?, Int?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            OutlinedTextField(
-                value = hour?.toString() ?: "",
-                onValueChange = {
-                    val h = it.toIntOrNull()?.coerceIn(0, 23)
-                    onTimeChange(h, minute)
-                },
-                placeholder = { Text("HH") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-            )
-            Text(":", modifier = Modifier.padding(top = 16.dp))
-            OutlinedTextField(
-                value = minute?.toString() ?: "",
-                onValueChange = {
-                    val m = it.toIntOrNull()?.coerceIn(0, 59)
-                    onTimeChange(hour, m)
-                },
-                placeholder = { Text("MM") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-            )
         }
     }
 }

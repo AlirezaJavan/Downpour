@@ -1,23 +1,21 @@
 package io.github.alirezajavan.downpour.api
 
 /**
- * Defines when a download is allowed to run.
+ * Defines the specific time range when a download is allowed to run.
  *
- * @property scheduleStartMinuteOfDay Local time minute of day (0..1439) when the download can start.
- * @property scheduleEndMinuteOfDay Local time minute of day (0..1439) when the download must pause.
- * @property scheduledAtMillis Absolute UTC timestamp after which the download is allowed to start.
+ * @property startTimeMillis Absolute UTC timestamp after which the download is allowed to start.
+ * @property endTimeMillis Absolute UTC timestamp after which the download must stop.
  */
 public data class DownloadSchedule(
-    val scheduleStartMinuteOfDay: Int? = null,
-    val scheduleEndMinuteOfDay: Int? = null,
-    val scheduledAtMillis: Long? = null,
+    val startTimeMillis: Long? = null,
+    val endTimeMillis: Long? = null,
 ) {
-    public val hasWindow: Boolean
-        get() = scheduleStartMinuteOfDay != null && scheduleEndMinuteOfDay != null
+    public val hasStart: Boolean
+        get() = startTimeMillis != null
 
-    public val hasDate: Boolean
-        get() = scheduledAtMillis != null
+    public val hasEnd: Boolean
+        get() = endTimeMillis != null
 
     public val isEmpty: Boolean
-        get() = !hasWindow && !hasDate
+        get() = !hasStart && !hasEnd
 }

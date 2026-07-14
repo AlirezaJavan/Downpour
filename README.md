@@ -23,7 +23,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 - **Fast** — multi-connection segmented downloading with automatic single/multi selection based on file size and server support.
 - **Adaptive Performance** — automatically scales connection counts up/down based on real-time network throughput (opt-in).
 - **Battery- and data-aware** — gate downloads on network type, charging, battery, and free-storage conditions; everything re-evaluates reactively.
-- **Scheduling** — run downloads at specific times or within recurring daily windows.
+- **Scheduling** — run downloads at specific times or within absolute time windows.
 - **Coroutine-first** — `suspend` operations and `Flow` observation throughout; no callbacks unless you want them.
 - **Customizable** — pluggable strategies and hooks for filenames, logging, post-processing, auth, and notifications.
 - **Drop-in UI** — an optional Jetpack Compose card component for download status and controls.
@@ -154,8 +154,8 @@ downloadRequest(url, destinationPath) {
     requiresStorageNotLow(true)
 
     // Scheduling
-    scheduleWindow(2, 0, 6, 0)                              // daily 2 AM - 6 AM window
-    scheduleAt(1735689600000L)                              // specific future timestamp
+    schedule(startTimeMillis, endTimeMillis)                // absolute UTC window
+    scheduleAt(startTimeMillis)                             // specific start time
 }
 ```
 
@@ -216,8 +216,8 @@ downloadManager.observeGroupProgress("backups").collect { g ->
 `NetworkType` (`ANY`, `UNMETERED`, `NOT_ROAMING`) plus per-request `requiresCharging` / `requiresBatteryNotLow` / `requiresStorageNotLow`. 
 
 **Scheduling**:
-- `scheduleWindow(startHour, startMinute, endHour, endMinute)`: Daily recurring window.
-- `scheduleAt(timestampMillis)`: One-time specific start date/time.
+- `schedule(startTimeMillis, endTimeMillis)`: Start and stop at absolute timestamps.
+- `scheduleAt(startTimeMillis)`: One-time specific start date/time.
 
 A running download that loses its required network moves to `WaitingForNetwork`; a constrained or scheduled download starts automatically the moment conditions are met — all are re-evaluated reactively.
 

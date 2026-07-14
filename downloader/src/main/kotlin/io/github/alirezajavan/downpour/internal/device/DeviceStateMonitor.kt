@@ -13,13 +13,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import java.util.Calendar
 
 internal data class DeviceState(
     val isCharging: Boolean,
     val isBatteryLow: Boolean,
     val isStorageLow: Boolean,
-    val currentTimeMinuteOfDay: Int,
     val currentTimeMillis: Long,
 ) {
     fun satisfies(
@@ -35,19 +33,12 @@ internal data class DeviceState(
 
         if (!deviceSatisfied) return false
 
-        if (schedule.scheduledAtMillis != null && currentTimeMillis < schedule.scheduledAtMillis) {
+        if (schedule.startTimeMillis != null && currentTimeMillis < schedule.startTimeMillis) {
             return false
         }
 
-        if (schedule.hasWindow) {
-            val start = schedule.scheduleStartMinuteOfDay!!
-            val end = schedule.scheduleEndMinuteOfDay!!
-            return if (start < end) {
-                currentTimeMinuteOfDay in start until end
-            } else {
-                // Window crosses midnight (e.g. 22:00 to 06:00)
-                currentTimeMinuteOfDay !in end..<start
-            }
+        if (schedule.endTimeMillis != null && currentTimeMillis >= schedule.endTimeMillis) {
+            return false
         }
 
         return true
@@ -59,13 +50,10 @@ internal class DeviceStateMonitor(
 ) {
     fun snapshot(): DeviceState {
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val calendar = Calendar.getInstance()
-        val currentMinute = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         return DeviceState(
             isCharging = battery.isCharging(),
             isBatteryLow = battery.batteryFraction() <= BATTERY_LOW_FRACTION,
             isStorageLow = checkStorageLow(),
-            currentTimeMinuteOfDay = currentMinute,
             currentTimeMillis = System.currentTimeMillis(),
         )
     }

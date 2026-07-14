@@ -123,7 +123,6 @@ class DownloadEngineTest {
                     isCharging = false,
                     isBatteryLow = false,
                     isStorageLow = false,
-                    currentTimeMinuteOfDay = 0,
                     currentTimeMillis = 0,
                 )
             val runner = mockk<DownloadTaskRunner>(relaxed = true)

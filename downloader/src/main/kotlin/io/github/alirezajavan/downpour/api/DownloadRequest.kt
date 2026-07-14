@@ -93,27 +93,20 @@ public class DownloadRequest private constructor(
 
         public fun requiresStorageNotLow(required: Boolean): Builder = apply { this.requiresStorageNotLow = required }
 
-        public fun scheduleWindow(
-            startHour: Int,
-            startMinute: Int,
-            endHour: Int,
-            endMinute: Int,
+        public fun schedule(
+            startTimeMillis: Long,
+            endTimeMillis: Long? = null,
         ): Builder =
             apply {
-                require(startHour in 0..23) { "startHour must be in 0..23" }
-                require(startMinute in 0..59) { "startMinute must be in 0..59" }
-                require(endHour in 0..23) { "endHour must be in 0..23" }
-                require(endMinute in 0..59) { "endMinute must be in 0..59" }
-                this.schedule =
-                    this.schedule.copy(
-                        scheduleStartMinuteOfDay = startHour * 60 + startMinute,
-                        scheduleEndMinuteOfDay = endHour * 60 + endMinute,
-                    )
+                if (endTimeMillis != null) {
+                    require(endTimeMillis > startTimeMillis) { "endTimeMillis must be after startTimeMillis" }
+                }
+                this.schedule = DownloadSchedule(startTimeMillis, endTimeMillis)
             }
 
         public fun scheduleAt(timestampMillis: Long): Builder =
             apply {
-                this.schedule = this.schedule.copy(scheduledAtMillis = timestampMillis)
+                this.schedule = DownloadSchedule(startTimeMillis = timestampMillis)
             }
 
         public fun metadata(
