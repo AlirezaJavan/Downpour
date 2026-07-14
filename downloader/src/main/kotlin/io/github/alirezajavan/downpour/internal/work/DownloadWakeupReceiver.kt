@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import io.github.alirezajavan.downpour.internal.util.AndroidLogger
 
 internal class DownloadWakeupReceiver : BroadcastReceiver() {
@@ -18,6 +19,12 @@ internal class DownloadWakeupReceiver : BroadcastReceiver() {
         val logger = AndroidLogger(true)
         logger.d("DownloadWakeupReceiver: wakeup alarm received ($action)")
 
+        // Start the service immediately. Being in the onReceive of an alarm (especially an exact
+        // one) provides a window to start a foreground service even from the background.
+        // This prevents ForegroundServiceStartNotAllowedException when the engine later
+        // decides to start a download.
+        io.github.alirezajavan.downpour.internal.service.DownloadService
+            .start(context)
         DownloadRecoveryWorker.schedule(context)
     }
 
@@ -40,7 +47,33 @@ internal class DownloadWakeupReceiver : BroadcastReceiver() {
                 )
 
             val triggerAt = System.currentTimeMillis() + delayMillis
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+
+            // On Android 12+, exact alarms grant an exemption to start foreground services from
+            // the background. We prefer exact if the permission is granted.
+            val canScheduleExact =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
+                } else {
+                    true
+                }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (canScheduleExact && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerAt,
+                        pendingIntent,
+                    )
+                } else {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerAt,
+                        pendingIntent,
+                    )
+                }
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            }
         }
 
         fun cancel(context: Context) {

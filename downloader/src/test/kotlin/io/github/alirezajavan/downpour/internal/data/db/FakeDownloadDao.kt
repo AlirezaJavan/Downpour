@@ -235,6 +235,12 @@ internal class FakeDownloadDao : DownloadDao {
         publish()
     }
 
+    override suspend fun findNonTerminalByUrlAndPath(
+        url: String,
+        path: String,
+        terminal: List<DownloadStatus>,
+    ): String? = rows.values.firstOrNull { it.url == url && it.destinationPath == path && it.status !in terminal }?.id
+
     override suspend fun insertParts(parts: List<DownloadPartEntity>) {
         parts.forEach { part ->
             val withId = if (part.id == 0L) part.copy(id = partIds.getAndIncrement()) else part

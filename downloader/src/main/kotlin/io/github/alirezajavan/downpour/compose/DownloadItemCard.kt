@@ -11,6 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.DownloadDestination
@@ -31,9 +32,11 @@ public fun DownloadItemCard(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             val fileName =
-                when (val dest = item.destination) {
-                    is DownloadDestination.File -> dest.path.substringAfterLast('/')
-                    is DownloadDestination.Uri -> dest.uriString.substringAfterLast('/')
+                remember(item.destination) {
+                    when (val dest = item.destination) {
+                        is DownloadDestination.File -> dest.path.substringAfterLast('/')
+                        is DownloadDestination.Uri -> dest.uriString.substringAfterLast('/')
+                    }
                 }
             Text(text = fileName)
             Text(text = describe(item.state))
@@ -50,6 +53,17 @@ public fun DownloadItemCard(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
 
+            val isPausable =
+                item.state is DownloadState.Running || item.state is DownloadState.Queued ||
+                    item.state is DownloadState.WaitingForNetwork || item.state is DownloadState.Scheduled
+            val isResumable =
+                item.state is DownloadState.Paused || item.state is DownloadState.Failed ||
+                    item.state is DownloadState.Cancelled
+            val isCancellable =
+                item.state is DownloadState.Running || item.state is DownloadState.Queued ||
+                    item.state is DownloadState.Paused || item.state is DownloadState.WaitingForNetwork ||
+                    item.state is DownloadState.Scheduled
+
             // FlowRow so the action buttons wrap onto the next line on narrow screens instead of
             // overflowing / clipping the last button.
             FlowRow(
@@ -57,9 +71,9 @@ public fun DownloadItemCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Button(onClick = { onPause(item.id) }) { Text("Pause") }
-                Button(onClick = { onResume(item.id) }) { Text("Resume") }
-                Button(onClick = { onCancel(item.id) }) { Text("Cancel") }
+                Button(onClick = { onPause(item.id) }, enabled = isPausable) { Text("Pause") }
+                Button(onClick = { onResume(item.id) }, enabled = isResumable) { Text("Resume") }
+                Button(onClick = { onCancel(item.id) }, enabled = isCancellable) { Text("Cancel") }
                 Button(onClick = { onRemove(item.id) }) { Text("Remove") }
             }
         }

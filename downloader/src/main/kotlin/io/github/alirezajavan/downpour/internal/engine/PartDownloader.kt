@@ -160,13 +160,11 @@ internal class PartDownloader(
         stream: InputStream,
         buffer: ByteArray,
     ): Int =
-        withContext(Dispatchers.IO) {
-            try {
-                stream.read(buffer)
-            } catch (io: IOException) {
-                currentCoroutineContext().ensureActive()
-                throw DownloadError.Connection(io)
-            }
+        try {
+            stream.read(buffer)
+        } catch (io: IOException) {
+            currentCoroutineContext().ensureActive()
+            throw DownloadError.Connection(io)
         }
 
     private data class ResolvedRange(

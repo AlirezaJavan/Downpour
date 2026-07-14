@@ -47,6 +47,20 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 - **minSdk 24** (Android 7.0), **compileSdk 37**
 - **JDK 17+**
 
+## Permissions
+
+Downpour requires several permissions to operate reliably in the background. While the library manifest includes these, your app must handle runtime requests and special permission checks:
+
+1. **Notifications** (`POST_NOTIFICATIONS`): Required on API 33+ to show the foreground service progress.
+2. **Exact Alarms** (`SCHEDULE_EXACT_ALARM`): Required for scheduled downloads (`scheduleAt`, `scheduleWindow`) to fire precisely when the app is in the background or the device is in Doze mode.
+
+```xml
+<manifest>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+</manifest>
+```
+
 ## Installation
 
 ```kotlin
@@ -156,6 +170,9 @@ downloadRequest(url, destinationPath) {
     // Scheduling
     schedule(startTimeMillis, endTimeMillis)                // absolute UTC window
     scheduleAt(startTimeMillis)                             // specific start time
+
+    // Duplicate prevention
+    duplicatePolicy(DuplicatePolicy.REUSE_EXISTING)         // REUSE_EXISTING | ALLOW_DUPLICATE
 }
 ```
 
@@ -194,6 +211,21 @@ val ids = downloadManager.enqueueAll(listOf(req1, req2, req3))
 
 downloadManager.setPriority(ids[2], Priority.HIGH)   // reorder a queued item
 downloadManager.moveToFront(ids[2])                  // jump ahead of everything queued
+```
+
+### Queue Export & Import
+
+Downpour supports serializing the current download queue to JSON for data portability or backup. This exports all non-terminal downloads (pending, paused, failed) and lets you restore them on another device or installation.
+
+```kotlin
+// Export current queue to JSON string
+val jsonString: String = downloadManager.exportQueue()
+
+// Import queue back with a conflict strategy
+val newIds: List<String> = downloadManager.importQueue(
+    jsonString = jsonString,
+    conflictStrategy = ConflictStrategy.RENAME, // OVERWRITE | RENAME | FAIL
+)
 ```
 
 ### Tags & group progress
@@ -370,6 +402,7 @@ DownloadItemCard(
 | `adaptiveConcurrency` | `false` | Enable dynamic connection tuning based on network speed. |
 | `minConnections` | `1` | Minimum connections per download when adaptive is enabled. |
 | `concurrencyReevaluationInterval` | `5s` | How often to re-evaluate connection count. |
+| `duplicatePolicy` | `REUSE_EXISTING` | Strategy for duplicate enqueues (REUSE_EXISTING or ALLOW_DUPLICATE). |
 
 ---
 

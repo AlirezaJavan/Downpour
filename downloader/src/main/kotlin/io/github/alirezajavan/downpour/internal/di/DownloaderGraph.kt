@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit
 
 internal class DownloaderGraph private constructor(
     context: Context,
-    config: DownloadManagerConfig,
+    private val config: DownloadManagerConfig,
 ) {
     private val appContext = context.applicationContext
     private val ioDispatcher = config.ioDispatcher
@@ -62,8 +62,7 @@ internal class DownloaderGraph private constructor(
     private val ipv6HealthTracker = Ipv6HealthTracker(startTripped = config.preferIpv4)
 
     private val httpClient =
-        (config.okHttpClient ?: OkHttpClient())
-            .newBuilder()
+        (config.okHttpClient?.newBuilder() ?: OkHttpClient.Builder())
             .apply {
                 if (config.okHttpClient == null) {
                     // We own this client outright, so it's safe to install our own Dns/EventListener
@@ -177,8 +176,10 @@ internal class DownloaderGraph private constructor(
      */
     private fun shutdown() {
         scope.cancel()
-        httpClient.dispatcher.executorService.shutdown()
-        httpClient.connectionPool.evictAll()
+        if (config.okHttpClient == null) {
+            httpClient.dispatcher.executorService.shutdown()
+            httpClient.connectionPool.evictAll()
+        }
         database.close()
     }
 

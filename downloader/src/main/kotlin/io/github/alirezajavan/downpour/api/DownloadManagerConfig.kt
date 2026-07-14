@@ -35,6 +35,7 @@ public data class DownloadManagerConfig(
     val adaptiveConcurrency: Boolean = false,
     val minConnections: Int = DEFAULT_MIN_CONNECTIONS,
     val concurrencyReevaluationInterval: Duration = DEFAULT_REEVALUATION_INTERVAL,
+    val duplicatePolicy: DuplicatePolicy = DuplicatePolicy.REUSE_EXISTING,
 ) {
     init {
         require(maxConcurrentDownloads >= 1) { "maxConcurrentDownloads must be >= 1" }

@@ -43,6 +43,7 @@ internal class DownloadEngine(
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val retryJobs = ConcurrentHashMap<String, Job>()
     private val tuningJobs = ConcurrentHashMap<String, Job>()
+    private val tuners = ConcurrentHashMap<String, ConnectionTuner>()
 
     // Downloads the server has 429'd for concurrency. Adaptive tuning is never (re)started for
     // these: a fresh ConnectionTuner always tries to *increase* connections on its first evaluation
@@ -66,6 +67,7 @@ internal class DownloadEngine(
     private val scheduleMutex = Mutex()
     private val networkWatchStarted = AtomicBoolean(false)
     private val isRecovered = AtomicBoolean(false)
+    private var wakeupJob: Job? = null
 
     suspend fun recover() {
         if (isRecovered.getAndSet(true)) return
@@ -99,6 +101,7 @@ internal class DownloadEngine(
             cancelRetry(id)
             repository.setStatus(id, DownloadStatus.PAUSED)
             cancelJob(id)
+            tuners.remove(id)
         }
         schedule()
     }
@@ -119,6 +122,7 @@ internal class DownloadEngine(
             entities.forEach {
                 cancelRetry(it.id)
                 cancelJob(it.id)
+                tuners.remove(it.id)
             }
         }
         schedule()
@@ -141,6 +145,7 @@ internal class DownloadEngine(
                 cancelJob(entity.id)
                 clearRateLimited(entity.id)
                 discardArtifacts(entity)
+                tuners.remove(entity.id)
             }
         }
         schedule()
@@ -157,6 +162,7 @@ internal class DownloadEngine(
                 cancelJob(entity.id)
                 clearRateLimited(entity.id)
                 if (deleteFiles) fileStore.delete(entity.toDestination())
+                tuners.remove(entity.id)
             }
             repository.deleteByTag(tag)
         }
@@ -192,6 +198,7 @@ internal class DownloadEngine(
             cancelJob(id)
             clearRateLimited(id)
             discardArtifacts(entity)
+            tuners.remove(id)
         }
         schedule()
     }
@@ -201,6 +208,7 @@ internal class DownloadEngine(
             cancelAllRetries()
             repository.setStatusIn(ACTIVE_STATUSES, DownloadStatus.PAUSED)
             cancelActiveJobs()
+            tuners.clear()
         }
         schedule()
     }
@@ -221,6 +229,7 @@ internal class DownloadEngine(
             repository.setStatusIn(INTERRUPTIBLE_STATUSES, DownloadStatus.CANCELLED)
             cancelActiveJobs()
             affected.forEach { discardArtifacts(it) }
+            tuners.clear()
         }
         schedule()
     }
@@ -233,6 +242,7 @@ internal class DownloadEngine(
             cancelRetry(id)
             cancelJob(id)
             clearRateLimited(id)
+            tuners.remove(id)
             val entity = repository.getEntity(id)
             if (deleteFile) entity?.let { fileStore.delete(it.toDestination()) }
             repository.delete(id)
@@ -344,6 +354,8 @@ internal class DownloadEngine(
     private suspend fun scheduleNextWakeup() {
         val statuses = listOf(DownloadStatus.SCHEDULED, DownloadStatus.RUNNING)
         val entities = repository.entitiesByStatuses(statuses)
+        wakeupJob?.cancel()
+
         if (entities.isEmpty()) return
 
         val now = System.currentTimeMillis()
@@ -356,6 +368,14 @@ internal class DownloadEngine(
         if (nextDelayMillis > 0 && nextDelayMillis != Long.MAX_VALUE) {
             logger.d("Scheduling wakeup for next event in ${nextDelayMillis / 1000}s")
             scheduler.schedule(nextDelayMillis)
+
+            // For foreground/active process: trigger schedule() via delay() for exact timing.
+            // AlarmManager is often batched/delayed even in foreground.
+            wakeupJob =
+                scope.launch {
+                    delay(nextDelayMillis.milliseconds)
+                    schedule()
+                }
         }
     }
 
@@ -435,7 +455,10 @@ internal class DownloadEngine(
         maxConnections: Int,
     ) {
         cancelTuning(id)
-        val tuner = ConnectionTuner(config.minConnections, maxConnections.coerceAtMost(MAX_PARTS))
+        val tuner =
+            tuners.getOrPut(id) {
+                ConnectionTuner(config.minConnections, maxConnections.coerceAtMost(MAX_PARTS))
+            }
         val job =
             scope.launch {
                 while (true) {
@@ -516,6 +539,7 @@ internal class DownloadEngine(
                 )
                 repository.setStatus(entity.id, DownloadStatus.COMPLETED)
                 repository.clearParts(entity.id)
+                tuners.remove(entity.id)
                 true
             }
         if (!finalized) return
@@ -554,6 +578,7 @@ internal class DownloadEngine(
                         "(retryable=${effectiveError.isRetryable}, attempt=$attempt/${entity.maxRetries})",
                 )
                 repository.setError(entity.id, effectiveError, attempt)
+                tuners.remove(entity.id)
             }
         }
     }

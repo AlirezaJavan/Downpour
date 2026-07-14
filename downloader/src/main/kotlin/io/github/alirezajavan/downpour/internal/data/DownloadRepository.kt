@@ -157,6 +157,11 @@ internal class DownloadRepository(
 
     suspend fun delete(id: String) = dao.delete(id)
 
+    suspend fun findNonTerminalByUrlAndPath(
+        url: String,
+        path: String,
+    ): String? = dao.findNonTerminalByUrlAndPath(url, path, TERMINAL_STATUSES)
+
     suspend fun replaceParts(parts: List<DownloadPartEntity>) {
         if (parts.isEmpty()) return
         dao.deleteParts(parts.first().downloadId)

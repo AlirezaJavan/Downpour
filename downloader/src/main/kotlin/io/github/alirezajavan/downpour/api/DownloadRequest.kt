@@ -19,6 +19,7 @@ public class DownloadRequest private constructor(
     public val requiresBatteryNotLow: Boolean,
     public val requiresStorageNotLow: Boolean,
     public val schedule: DownloadSchedule,
+    public val duplicatePolicy: DuplicatePolicy?,
 ) {
     @Deprecated("Use destination instead", ReplaceWith("destination"))
     public val destinationPath: String
@@ -47,6 +48,7 @@ public class DownloadRequest private constructor(
         private var requiresBatteryNotLow: Boolean = false
         private var requiresStorageNotLow: Boolean = false
         private var schedule: DownloadSchedule = DownloadSchedule()
+        private var duplicatePolicy: DuplicatePolicy? = null
 
         public fun header(
             name: String,
@@ -114,6 +116,8 @@ public class DownloadRequest private constructor(
             value: String,
         ): Builder = apply { metadata[key] = value }
 
+        public fun duplicatePolicy(policy: DuplicatePolicy): Builder = apply { this.duplicatePolicy = policy }
+
         public fun build(): DownloadRequest {
             require(url.isNotBlank()) { "url must not be blank" }
             return DownloadRequest(
@@ -135,6 +139,7 @@ public class DownloadRequest private constructor(
                 requiresBatteryNotLow = requiresBatteryNotLow,
                 requiresStorageNotLow = requiresStorageNotLow,
                 schedule = schedule,
+                duplicatePolicy = duplicatePolicy,
             )
         }
     }
