@@ -21,7 +21,9 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 
 - **Reliable by design** — resumable transfers, process-death recovery, and a state machine that guarantees a paused or cancelled download can never keep advancing.
 - **Fast** — multi-connection segmented downloading with automatic single/multi selection based on file size and server support.
+- **Adaptive Performance** — automatically scales connection counts up/down based on real-time network throughput (opt-in).
 - **Battery- and data-aware** — gate downloads on network type, charging, battery, and free-storage conditions; everything re-evaluates reactively.
+- **Scheduling** — run downloads at specific times or within recurring daily windows.
 - **Coroutine-first** — `suspend` operations and `Flow` observation throughout; no callbacks unless you want them.
 - **Customizable** — pluggable strategies and hooks for filenames, logging, post-processing, auth, and notifications.
 - **Drop-in UI** — an optional Jetpack Compose card component for download status and controls.
@@ -104,6 +106,7 @@ downloadManager.observe(id).collect { item ->
 
 - **`DownloadManager`** — the single entry point. Returned by `Downpour.getInstance(context, config)`. Call `Downpour.reconfigure(context, config)` to rebuild the engine in place with a new config (e.g. after a settings change) — in-flight downloads are requeued and resumed by the new engine, no process restart required.
 - **`DownloadRequest`** — an immutable description of *what* to download and *how*, built with the `downloadRequest { }` DSL.
+- **`DownloadDestination`** — where to save the file: `File(path)` or `Uri(uriString)` (for Scoped Storage).
 - **`DownloadItem`** — a snapshot of a download (id, url, destination, `state`, tag, metadata, timestamps).
 - **`DownloadState`** — a sealed type: `Queued`, `Scheduled`, `Running`, `Paused`, `Completed`, `Failed`, `WaitingForNetwork`, `Cancelled`.
 
@@ -156,9 +159,33 @@ downloadRequest(url, destinationPath) {
 }
 ```
 
-### Multi-connection & throttling
+### Storage & Destinations
 
-Downpour automatically splits eligible downloads into parallel segments (controlled per request via `maxConnections`, and globally via `DownloadManagerConfig.minSizeForMultiConnection`). Bandwidth can be capped globally (`config.maxBytesPerSecond`) and per download (`maxBytesPerSecond { }`).
+Downpour supports both direct file paths and Scoped Storage `Uri`s. 
+
+```kotlin
+// Direct file path (internal or external storage)
+val req1 = downloadRequest(url, context.getExternalFilesDir(null)!!.path + "/file.zip")
+
+// Scoped Storage Uri (MediaStore or Storage Access Framework)
+val req2 = downloadRequest(url, DownloadDestination.Uri(contentUri.toString()))
+```
+
+### Multi-connection & adaptive concurrency
+
+Downpour automatically splits eligible downloads into parallel segments (controlled per request via `maxConnections`, and globally via `DownloadManagerConfig.minSizeForMultiConnection`). 
+
+**Adaptive Concurrency** (opt-in) monitors real-time throughput and dynamically adjusts the connection count between `minConnections` and `maxConnections` to find the network's "sweet spot" without triggering server-side throttling.
+
+```kotlin
+DownloadManagerConfig(
+    adaptiveConcurrency = true,
+    minConnections = 2,
+    concurrencyReevaluationInterval = 5.seconds
+)
+```
+
+Bandwidth can be capped globally (`config.maxBytesPerSecond`) and per download (`maxBytesPerSecond { }`).
 
 ### Runtime queue control
 
@@ -340,6 +367,9 @@ DownloadItemCard(
 | `expireCompletedAfter` | `null` | Auto-remove old completed records. |
 | `verbose` | `false` | Enable debug logging. |
 | `preferIpv4` | `false` | Prefer IPv4 DNS results. |
+| `adaptiveConcurrency` | `false` | Enable dynamic connection tuning based on network speed. |
+| `minConnections` | `1` | Minimum connections per download when adaptive is enabled. |
+| `concurrencyReevaluationInterval` | `5s` | How often to re-evaluate connection count. |
 
 ---
 
