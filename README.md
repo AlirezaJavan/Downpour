@@ -2,7 +2,7 @@
 
 [![Android CI](https://github.com/alirezajavan/downpour/actions/workflows/android.yml/badge.svg)](https://github.com/alirezajavan/downpour/actions/workflows/android.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.alirezajavan/downpour)](https://central.sonatype.com/artifact/io.github.alirezajavan/downpour)
-[![API](https://img.shields.io/badge/API-23%2B-brightgreen.svg)](https://android-arsenal.com/api?level=23)
+[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 A production-grade, coroutine-first **download manager** for Android.
@@ -105,7 +105,7 @@ downloadManager.observe(id).collect { item ->
 - **`DownloadManager`** — the single entry point. Returned by `Downpour.getInstance(context, config)`. Call `Downpour.reconfigure(context, config)` to rebuild the engine in place with a new config (e.g. after a settings change) — in-flight downloads are requeued and resumed by the new engine, no process restart required.
 - **`DownloadRequest`** — an immutable description of *what* to download and *how*, built with the `downloadRequest { }` DSL.
 - **`DownloadItem`** — a snapshot of a download (id, url, destination, `state`, tag, metadata, timestamps).
-- **`DownloadState`** — a sealed type: `Queued`, `Running`, `Paused`, `Completed`, `Failed`, `WaitingForNetwork`, `Cancelled`.
+- **`DownloadState`** — a sealed type: `Queued`, `Scheduled`, `Running`, `Paused`, `Completed`, `Failed`, `WaitingForNetwork`, `Cancelled`.
 
 ---
 
