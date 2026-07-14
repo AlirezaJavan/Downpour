@@ -23,6 +23,25 @@ class DownloadRequestTest {
     }
 
     @Test
+    fun `scheduleWindow sets correct minute of day`() {
+        val request =
+            DownloadRequest
+                .Builder("https://example.com", "/path/to/file")
+                .scheduleWindow(2, 30, 6, 45)
+                .build()
+
+        assertThat(request.scheduleStartMinuteOfDay).isEqualTo(2 * 60 + 30)
+        assertThat(request.scheduleEndMinuteOfDay).isEqualTo(6 * 60 + 45)
+    }
+
+    @Test
+    fun `scheduleWindow throws for invalid hours`() {
+        assertThrows<IllegalArgumentException> {
+            DownloadRequest.Builder("u", "p").scheduleWindow(24, 0, 1, 0)
+        }
+    }
+
+    @Test
     fun `builder throws exception for blank url`() {
         assertThrows<IllegalArgumentException> {
             DownloadRequest.Builder("", "/path/to/file").build()

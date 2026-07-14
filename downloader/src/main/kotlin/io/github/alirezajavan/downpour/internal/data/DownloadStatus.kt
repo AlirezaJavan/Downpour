@@ -8,4 +8,5 @@ internal enum class DownloadStatus {
     FAILED,
     CANCELLED,
     WAITING_FOR_NETWORK,
+    SCHEDULED,
 }

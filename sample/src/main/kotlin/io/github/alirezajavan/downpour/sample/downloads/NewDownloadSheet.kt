@@ -32,13 +32,17 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
@@ -46,6 +50,10 @@ import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 private data class Preset(
     val label: String,
@@ -215,6 +223,44 @@ fun NewDownloadSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                Section(title = "Scheduling Window") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TimeInput(
+                            label = "Start",
+                            hour = form.scheduleStartHour,
+                            minute = form.scheduleStartMinute,
+                            onTimeChange = { h, m ->
+                                form = form.copy(scheduleStartHour = h, scheduleStartMinute = m)
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        TimeInput(
+                            label = "End",
+                            hour = form.scheduleEndHour,
+                            minute = form.scheduleEndMinute,
+                            onTimeChange = { h, m ->
+                                form = form.copy(scheduleEndHour = h, scheduleEndMinute = m)
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Text(
+                        "Leave empty to start immediately. Supports midnight-crossing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Section(title = "Schedule Start Date") {
+                    DatePickerInput(
+                        selectedTimestamp = form.scheduledAtMillis,
+                        onTimestampChange = { form = form.copy(scheduledAtMillis = it) },
+                    )
+                }
             }
 
             Button(
@@ -223,6 +269,103 @@ fun NewDownloadSheet(
             ) {
                 Text("Start download")
             }
+        }
+    }
+}
+
+@Composable
+private fun DatePickerInput(
+    selectedTimestamp: Long?,
+    onTimestampChange: (Long?) -> Unit,
+) {
+    val context = LocalContext.current
+    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val text by remember(selectedTimestamp) {
+        derivedStateOf {
+            selectedTimestamp?.let { formatter.format(Date(it)) } ?: "Not scheduled"
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.weight(1f),
+            label = { Text("Start at") },
+        )
+        TextButton(onClick = {
+            val now = Calendar.getInstance()
+            android.app
+                .DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth ->
+                        android.app
+                            .TimePickerDialog(
+                                context,
+                                { _, hourOfDay, minute ->
+                                    val calendar = Calendar.getInstance()
+                                    calendar.set(year, month, dayOfMonth, hourOfDay, minute)
+                                    onTimestampChange(calendar.timeInMillis)
+                                },
+                                now.get(Calendar.HOUR_OF_DAY),
+                                now.get(Calendar.MINUTE),
+                                true,
+                            ).show()
+                    },
+                    now.get(Calendar.YEAR),
+                    now.get(Calendar.MONTH),
+                    now.get(Calendar.DAY_OF_MONTH),
+                ).show()
+        }) {
+            Text("Pick")
+        }
+        if (selectedTimestamp != null) {
+            TextButton(onClick = { onTimestampChange(null) }) {
+                Text("Clear")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimeInput(
+    label: String,
+    hour: Int?,
+    minute: Int?,
+    onTimeChange: (Int?, Int?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            OutlinedTextField(
+                value = hour?.toString() ?: "",
+                onValueChange = {
+                    val h = it.toIntOrNull()?.coerceIn(0, 23)
+                    onTimeChange(h, minute)
+                },
+                placeholder = { Text("HH") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+            Text(":", modifier = Modifier.padding(top = 16.dp))
+            OutlinedTextField(
+                value = minute?.toString() ?: "",
+                onValueChange = {
+                    val m = it.toIntOrNull()?.coerceIn(0, 59)
+                    onTimeChange(hour, m)
+                },
+                placeholder = { Text("MM") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
         }
     }
 }

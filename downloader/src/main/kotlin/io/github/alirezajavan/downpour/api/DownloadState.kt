@@ -26,11 +26,13 @@ public sealed interface DownloadState {
 
     public data object WaitingForNetwork : DownloadState
 
+    public data object Scheduled : DownloadState
+
     public data object Cancelled : DownloadState
 
     public val isTerminal: Boolean
         get() = this is Completed || this is Cancelled || (this is Failed && !error.isRetryable)
 
     public val isActive: Boolean
-        get() = this is Queued || this is Running
+        get() = this is Queued || this is Running || this is WaitingForNetwork
 }

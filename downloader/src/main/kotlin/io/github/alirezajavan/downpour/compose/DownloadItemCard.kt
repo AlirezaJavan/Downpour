@@ -97,4 +97,8 @@ private fun describe(state: DownloadState): String =
         is DownloadState.WaitingForNetwork -> {
             "Waiting for network"
         }
+
+        is DownloadState.Scheduled -> {
+            "Scheduled for window"
+        }
     }

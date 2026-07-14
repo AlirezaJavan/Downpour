@@ -29,15 +29,22 @@ internal class DownloadRecoveryWorker(
     companion object {
         private const val UNIQUE_NAME = "downpour_recovery"
 
-        fun schedule(context: Context) {
+        fun schedule(
+            context: Context,
+            delayMillis: Long = 0,
+        ) {
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
             val request =
                 OneTimeWorkRequestBuilder<DownloadRecoveryWorker>()
-                    .setConstraints(
-                        Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
-                    ).build()
+                    .setConstraints(constraints)
+                    .setInitialDelay(delayMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .build()
+
+            val policy = if (delayMillis > 0) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+
             WorkManager
                 .getInstance(context)
-                .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)
+                .enqueueUniqueWork(UNIQUE_NAME, policy, request)
         }
     }
 }

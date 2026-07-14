@@ -52,8 +52,13 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).addMigrations(DownloadDatabase.MIGRATION_3_4, DownloadDatabase.MIGRATION_4_5, DownloadDatabase.MIGRATION_5_6)
-            .fallbackToDestructiveMigration(false)
+            ).addMigrations(
+                DownloadDatabase.MIGRATION_3_4,
+                DownloadDatabase.MIGRATION_4_5,
+                DownloadDatabase.MIGRATION_5_6,
+                DownloadDatabase.MIGRATION_6_7,
+                DownloadDatabase.MIGRATION_7_8,
+            ).fallbackToDestructiveMigration(false)
             .build()
 
     val repository = DownloadRepository(database.downloadDao())
@@ -102,6 +107,14 @@ internal class DownloaderGraph private constructor(
 
     private val deviceStateMonitor = DeviceStateMonitor(appContext)
 
+    private val scheduler =
+        object : io.github.alirezajavan.downpour.internal.engine.DownloadScheduler {
+            override fun schedule(delayMillis: Long) {
+                io.github.alirezajavan.downpour.internal.work.DownloadRecoveryWorker
+                    .schedule(appContext, delayMillis)
+            }
+        }
+
     // Shared by every task instance so destination resolution across concurrent downloads is
     // serialized (prevents two same-URL downloads from claiming the same file).
     private val destinationMutex = Mutex()
@@ -130,6 +143,7 @@ internal class DownloaderGraph private constructor(
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             deviceStateMonitor = deviceStateMonitor,
+            scheduler = scheduler,
             fileStore = fileStore,
             logger = logger,
         )

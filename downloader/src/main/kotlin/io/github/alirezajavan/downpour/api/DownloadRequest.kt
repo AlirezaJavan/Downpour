@@ -18,6 +18,9 @@ public class DownloadRequest private constructor(
     public val requiresCharging: Boolean,
     public val requiresBatteryNotLow: Boolean,
     public val requiresStorageNotLow: Boolean,
+    public val scheduleStartMinuteOfDay: Int?,
+    public val scheduleEndMinuteOfDay: Int?,
+    public val scheduledAtMillis: Long?,
 ) {
     @Deprecated("Use destination instead", ReplaceWith("destination"))
     public val destinationPath: String
@@ -45,6 +48,9 @@ public class DownloadRequest private constructor(
         private var requiresCharging: Boolean = false
         private var requiresBatteryNotLow: Boolean = false
         private var requiresStorageNotLow: Boolean = false
+        private var scheduleStartMinuteOfDay: Int? = null
+        private var scheduleEndMinuteOfDay: Int? = null
+        private var scheduledAtMillis: Long? = null
 
         public fun header(
             name: String,
@@ -91,6 +97,23 @@ public class DownloadRequest private constructor(
 
         public fun requiresStorageNotLow(required: Boolean): Builder = apply { this.requiresStorageNotLow = required }
 
+        public fun scheduleWindow(
+            startHour: Int,
+            startMinute: Int,
+            endHour: Int,
+            endMinute: Int,
+        ): Builder =
+            apply {
+                require(startHour in 0..23) { "startHour must be in 0..23" }
+                require(startMinute in 0..59) { "startMinute must be in 0..59" }
+                require(endHour in 0..23) { "endHour must be in 0..23" }
+                require(endMinute in 0..59) { "endMinute must be in 0..59" }
+                this.scheduleStartMinuteOfDay = startHour * 60 + startMinute
+                this.scheduleEndMinuteOfDay = endHour * 60 + endMinute
+            }
+
+        public fun scheduleAt(timestampMillis: Long): Builder = apply { this.scheduledAtMillis = timestampMillis }
+
         public fun metadata(
             key: String,
             value: String,
@@ -116,6 +139,9 @@ public class DownloadRequest private constructor(
                 requiresCharging = requiresCharging,
                 requiresBatteryNotLow = requiresBatteryNotLow,
                 requiresStorageNotLow = requiresStorageNotLow,
+                scheduleStartMinuteOfDay = scheduleStartMinuteOfDay,
+                scheduleEndMinuteOfDay = scheduleEndMinuteOfDay,
+                scheduledAtMillis = scheduledAtMillis,
             )
         }
     }

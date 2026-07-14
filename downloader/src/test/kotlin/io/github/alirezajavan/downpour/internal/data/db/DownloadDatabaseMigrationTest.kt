@@ -65,6 +65,19 @@ class DownloadDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `migration 6 to 7 adds scheduling columns defaulting to null`() {
+        db.execSQL("INSERT INTO downloads (id, createdAtMillis) VALUES ('a', 123)")
+
+        DownloadDatabase.MIGRATION_6_7.migrate(db)
+
+        db.query("SELECT scheduleStartMinuteOfDay, scheduleEndMinuteOfDay FROM downloads WHERE id = 'a'").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.isNull(0)).isTrue()
+            assertThat(cursor.isNull(1)).isTrue()
+        }
+    }
+
     private companion object {
         const val VERSION_4 = 4
     }

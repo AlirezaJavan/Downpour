@@ -25,6 +25,7 @@ class DownloadEngineTest {
     private val serviceController = mockk<DownloadServiceController>(relaxed = true)
     private val networkMonitor = mockk<NetworkMonitor>(relaxed = true)
     private val deviceStateMonitor = mockk<DeviceStateMonitor>(relaxed = true)
+    private val scheduler = mockk<DownloadScheduler>(relaxed = true)
     private val fileStore = mockk<FileStore>(relaxed = true)
 
     private val engine =
@@ -36,6 +37,7 @@ class DownloadEngineTest {
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             deviceStateMonitor = deviceStateMonitor,
+            scheduler = scheduler,
             fileStore = fileStore,
             logger = NoOpLogger,
         )
@@ -104,6 +106,7 @@ class DownloadEngineTest {
                     serviceController = serviceController,
                     networkMonitor = networkMonitor,
                     deviceStateMonitor = deviceStateMonitor,
+                    scheduler = scheduler,
                     fileStore = fileStore,
                     logger = NoOpLogger,
                 )
@@ -112,7 +115,14 @@ class DownloadEngineTest {
             coEvery { repository.nextQueued(any()) } returns listOf(entity)
             coEvery { repository.getEntity("id") } returns entity
             every { networkMonitor.snapshot() } returns NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
-            every { deviceStateMonitor.snapshot() } returns DeviceState(isCharging = false, isBatteryLow = false, isStorageLow = false)
+            every { deviceStateMonitor.snapshot() } returns
+                DeviceState(
+                    isCharging = false,
+                    isBatteryLow = false,
+                    isStorageLow = false,
+                    currentTimeMinuteOfDay = 0,
+                    currentTimeMillis = 0,
+                )
             val runner = mockk<DownloadTaskRunner>(relaxed = true)
             // Keep the task "running" for the duration of the test -- a relaxed mock that returns
             // immediately would complete the job inline and cancel adaptive tuning before it ever

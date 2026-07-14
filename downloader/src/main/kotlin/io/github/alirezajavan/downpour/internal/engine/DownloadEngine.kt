@@ -19,9 +19,14 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Calendar
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
+
+internal interface DownloadScheduler {
+    fun schedule(delayMillis: Long)
+}
 
 internal class DownloadEngine(
     private val scope: CoroutineScope,
@@ -31,6 +36,7 @@ internal class DownloadEngine(
     private val serviceController: DownloadServiceController,
     private val networkMonitor: NetworkMonitor,
     private val deviceStateMonitor: DeviceStateMonitor,
+    private val scheduler: DownloadScheduler,
     private val fileStore: FileStore,
     private val logger: Logger,
 ) {
@@ -300,15 +306,91 @@ internal class DownloadEngine(
                     repository.setStatus(id, DownloadStatus.WAITING_FOR_NETWORK)
                     cancelJob(id)
                 } else if (!deviceSatisfied) {
-                    repository.setStatus(id, DownloadStatus.QUEUED)
+                    val statusToSet =
+                        if (device.isTimeRestricted(entity)) {
+                            DownloadStatus.SCHEDULED
+                        } else {
+                            DownloadStatus.QUEUED
+                        }
+                    repository.setStatus(id, statusToSet)
                     cancelJob(id)
+                }
+            }
+
+            repository.nextQueued(QUEUE_SCAN_LIMIT).forEach { entity ->
+                if (activeJobs.containsKey(entity.id)) return@forEach
+
+                val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
+                val deviceSatisfied = device.satisfiesConstraints(entity)
+
+                val targetStatus =
+                    when {
+                        !networkSatisfied -> DownloadStatus.WAITING_FOR_NETWORK
+                        !deviceSatisfied -> if (device.isTimeRestricted(entity)) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED
+                        else -> DownloadStatus.QUEUED
+                    }
+
+                if (entity.status != targetStatus) {
+                    repository.setStatus(entity.id, targetStatus)
                 }
             }
 
             val freeSlots = config.maxConcurrentDownloads - activeJobs.size
             if (freeSlots > 0) startEligible(freeSlots)
+            scheduleNextWakeup()
             serviceController.onActiveCountChanged(activeJobs.size)
         }
+
+    private suspend fun scheduleNextWakeup() {
+        val scheduled = repository.entitiesByStatuses(listOf(DownloadStatus.SCHEDULED))
+        if (scheduled.isEmpty()) return
+
+        val now = System.currentTimeMillis()
+        val nextDelayMillis =
+            scheduled.minOf { entity ->
+                val targetTime = calculateTargetTime(entity, now)
+                (targetTime - now).coerceAtLeast(0)
+            }
+
+        if (nextDelayMillis > 0 && nextDelayMillis != Long.MAX_VALUE) {
+            logger.d("Scheduling wakeup for next event in ${nextDelayMillis / 1000}s")
+            scheduler.schedule(nextDelayMillis)
+        }
+    }
+
+    private fun calculateTargetTime(
+        entity: DownloadEntity,
+        now: Long,
+    ): Long {
+        val dateTarget = entity.scheduledAtMillis ?: now
+        val calendar = Calendar.getInstance().apply { timeInMillis = dateTarget }
+        val minuteAtDateTarget = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+
+        val start = entity.scheduleStartMinuteOfDay ?: return dateTarget
+        val end = entity.scheduleEndMinuteOfDay ?: return dateTarget
+
+        // Is minuteAtDateTarget in window [start, end)?
+        val inWindow =
+            if (start < end) {
+                minuteAtDateTarget in start until end
+            } else {
+                // Window crosses midnight
+                minuteAtDateTarget >= start || minuteAtDateTarget < end
+            }
+
+        if (inWindow && dateTarget >= now) return dateTarget
+
+        // Not in window or target was in the past (which should have started already).
+        // Find the FIRST window start time that is >= dateTarget.
+        val diffMinutes =
+            if (start >= minuteAtDateTarget) {
+                start - minuteAtDateTarget
+            } else {
+                (1440 - minuteAtDateTarget) + start
+            }
+
+        return dateTarget + diffMinutes * 60 * 1000L
+    }
 
     private suspend fun startEligible(slots: Int) {
         val status = networkMonitor.snapshot()
@@ -326,7 +408,29 @@ internal class DownloadEngine(
     }
 
     private fun DeviceState.satisfiesConstraints(entity: DownloadEntity): Boolean =
-        satisfies(entity.requiresCharging, entity.requiresBatteryNotLow, entity.requiresStorageNotLow)
+        satisfies(
+            entity.requiresCharging,
+            entity.requiresBatteryNotLow,
+            entity.requiresStorageNotLow,
+            entity.scheduleStartMinuteOfDay,
+            entity.scheduleEndMinuteOfDay,
+            entity.scheduledAtMillis,
+        )
+
+    private fun DeviceState.isTimeRestricted(entity: DownloadEntity): Boolean {
+        if (entity.scheduledAtMillis != null && currentTimeMillis < entity.scheduledAtMillis) {
+            return true
+        }
+
+        val start = entity.scheduleStartMinuteOfDay ?: return false
+        val end = entity.scheduleEndMinuteOfDay ?: return false
+
+        return if (start < end) {
+            currentTimeMinuteOfDay !in start until end
+        } else {
+            currentTimeMinuteOfDay < start && currentTimeMinuteOfDay >= end
+        }
+    }
 
     /**
      * Starts a download. Must hold [scheduleMutex] (only [startEligible] calls it).
@@ -574,13 +678,19 @@ internal class DownloadEngine(
         const val MAX_PARTS = 16
         const val HTTP_TOO_MANY_REQUESTS = 429
         val ACTIVE_STATUSES =
-            listOf(DownloadStatus.QUEUED, DownloadStatus.RUNNING, DownloadStatus.WAITING_FOR_NETWORK)
+            listOf(
+                DownloadStatus.QUEUED,
+                DownloadStatus.RUNNING,
+                DownloadStatus.WAITING_FOR_NETWORK,
+                DownloadStatus.SCHEDULED,
+            )
         val INTERRUPTIBLE_STATUSES =
             listOf(
                 DownloadStatus.QUEUED,
                 DownloadStatus.RUNNING,
                 DownloadStatus.PAUSED,
                 DownloadStatus.WAITING_FOR_NETWORK,
+                DownloadStatus.SCHEDULED,
             )
     }
 }

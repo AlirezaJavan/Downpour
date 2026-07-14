@@ -50,7 +50,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.alirezajavan:downpour:0.3.0")
+    implementation("io.github.alirezajavan:downpour:0.6.0")
 }
 ```
 
@@ -149,6 +149,10 @@ downloadRequest(url, destinationPath) {
     requiresCharging(true)
     requiresBatteryNotLow(true)
     requiresStorageNotLow(true)
+
+    // Scheduling
+    scheduleWindow(2, 0, 6, 0)                              // daily 2 AM - 6 AM window
+    scheduleAt(1735689600000L)                              // specific future timestamp
 }
 ```
 
@@ -182,7 +186,13 @@ downloadManager.observeGroupProgress("backups").collect { g ->
 
 ### Network & device constraints
 
-`NetworkType` (`ANY`, `UNMETERED`, `NOT_ROAMING`) plus per-request `requiresCharging` / `requiresBatteryNotLow` / `requiresStorageNotLow`. A running download that loses its required network moves to `WaitingForNetwork`; a constrained download starts automatically the moment conditions are met — both are re-evaluated reactively.
+`NetworkType` (`ANY`, `UNMETERED`, `NOT_ROAMING`) plus per-request `requiresCharging` / `requiresBatteryNotLow` / `requiresStorageNotLow`. 
+
+**Scheduling**:
+- `scheduleWindow(startHour, startMinute, endHour, endMinute)`: Daily recurring window.
+- `scheduleAt(timestampMillis)`: One-time specific start date/time.
+
+A running download that loses its required network moves to `WaitingForNetwork`; a constrained or scheduled download starts automatically the moment conditions are met — all are re-evaluated reactively.
 
 ### Fallback mirrors
 

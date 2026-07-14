@@ -26,7 +26,14 @@ internal class DownloadRepository(
     fun observeAllItems(): Flow<List<DownloadItem>> = dao.observeAll().map { entities -> entities.map { it.toItem() } }
 
     suspend fun nextQueued(limit: Int): List<DownloadEntity> =
-        dao.getByStatuses(listOf(DownloadStatus.QUEUED, DownloadStatus.WAITING_FOR_NETWORK), limit)
+        dao.getByStatuses(
+            listOf(
+                DownloadStatus.QUEUED,
+                DownloadStatus.WAITING_FOR_NETWORK,
+                DownloadStatus.SCHEDULED,
+            ),
+            limit,
+        )
 
     suspend fun runningEntities(): List<DownloadEntity> = dao.getByStatuses(listOf(DownloadStatus.RUNNING), Int.MAX_VALUE)
 

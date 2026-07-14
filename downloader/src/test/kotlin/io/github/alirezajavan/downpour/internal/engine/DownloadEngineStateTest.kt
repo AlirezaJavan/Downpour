@@ -41,6 +41,7 @@ class DownloadEngineStateTest {
     private val repository = DownloadRepository(dao) { NOW }
     private val networkMonitor = mockk<NetworkMonitor>()
     private val deviceStateMonitor = mockk<DeviceStateMonitor>()
+    private val scheduler = mockk<DownloadScheduler>(relaxed = true)
     private val fileStore = mockk<FileStore>(relaxed = true)
     private val serviceCounts = mutableListOf<Int>()
     private val serviceController = DownloadServiceController { serviceCounts += it }
@@ -63,6 +64,7 @@ class DownloadEngineStateTest {
         serviceController = serviceController,
         networkMonitor = networkMonitor,
         deviceStateMonitor = deviceStateMonitor,
+        scheduler = scheduler,
         fileStore = fileStore,
         logger = NoOpLogger,
     )
@@ -336,6 +338,60 @@ class DownloadEngineStateTest {
             assertThat(status("b")).isEqualTo(DownloadStatus.QUEUED)
         }
 
+    @Test
+    fun `scheduleWindow keeps a download scheduled until the time window starts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            // Window is 2 AM to 6 AM (120 to 360 minutes)
+            val entity =
+                entity("a").copy(
+                    scheduleStartMinuteOfDay = 120,
+                    scheduleEndMinuteOfDay = 360,
+                )
+            repository.insert(entity)
+
+            // Current time is 1 AM (60 minutes)
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 60)
+            val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
+
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
+
+            // Current time is 3 AM (180 minutes)
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 180)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+
+            // Current time is 7 AM (420 minutes)
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMinuteOfDay = 420)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
+        }
+
+    @Test
+    fun `scheduleAt keeps a download scheduled until the specific timestamp is reached`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val scheduledTime = NOW + 10_000
+            val entity = entity("a").copy(scheduledAtMillis = scheduledTime)
+            repository.insert(entity)
+
+            // Current time is NOW
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = NOW)
+            val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
+
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
+
+            // Current time is after scheduledTime
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = scheduledTime + 1)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+        }
+
     private fun entity(
         id: String,
         createdAt: Long = 0,
@@ -427,6 +483,13 @@ class DownloadEngineStateTest {
         const val NOW = 1_000L
         val CONNECTED = NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
         val DISCONNECTED = NetworkStatus(isConnected = false, isMetered = true, isNotRoaming = false)
-        val UNCONSTRAINED = DeviceState(isCharging = false, isBatteryLow = false, isStorageLow = false)
+        val UNCONSTRAINED =
+            DeviceState(
+                isCharging = false,
+                isBatteryLow = false,
+                isStorageLow = false,
+                currentTimeMinuteOfDay = 0,
+                currentTimeMillis = NOW,
+            )
     }
 }

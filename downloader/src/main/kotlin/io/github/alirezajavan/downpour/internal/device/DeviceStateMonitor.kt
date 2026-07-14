@@ -12,20 +12,45 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.util.Calendar
 
 internal data class DeviceState(
     val isCharging: Boolean,
     val isBatteryLow: Boolean,
     val isStorageLow: Boolean,
+    val currentTimeMinuteOfDay: Int,
+    val currentTimeMillis: Long,
 ) {
     fun satisfies(
         requiresCharging: Boolean,
         requiresBatteryNotLow: Boolean,
         requiresStorageNotLow: Boolean,
-    ): Boolean =
-        (!requiresCharging || isCharging) &&
-            (!requiresBatteryNotLow || !isBatteryLow) &&
-            (!requiresStorageNotLow || !isStorageLow)
+        scheduleStart: Int?,
+        scheduleEnd: Int?,
+        scheduledAt: Long?,
+    ): Boolean {
+        val deviceSatisfied =
+            (!requiresCharging || isCharging) &&
+                (!requiresBatteryNotLow || !isBatteryLow) &&
+                (!requiresStorageNotLow || !isStorageLow)
+
+        if (!deviceSatisfied) return false
+
+        if (scheduledAt != null && currentTimeMillis < scheduledAt) {
+            return false
+        }
+
+        if (scheduleStart != null && scheduleEnd != null) {
+            return if (scheduleStart < scheduleEnd) {
+                currentTimeMinuteOfDay in scheduleStart until scheduleEnd
+            } else {
+                // Window crosses midnight (e.g. 22:00 to 06:00)
+                currentTimeMinuteOfDay >= scheduleStart || currentTimeMinuteOfDay < scheduleEnd
+            }
+        }
+
+        return true
+    }
 }
 
 internal class DeviceStateMonitor(
@@ -33,10 +58,14 @@ internal class DeviceStateMonitor(
 ) {
     fun snapshot(): DeviceState {
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val calendar = Calendar.getInstance()
+        val currentMinute = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         return DeviceState(
             isCharging = battery.isCharging(),
             isBatteryLow = battery.batteryFraction() <= BATTERY_LOW_FRACTION,
             isStorageLow = checkStorageLow(),
+            currentTimeMinuteOfDay = currentMinute,
+            currentTimeMillis = System.currentTimeMillis(),
         )
     }
 
@@ -80,6 +109,7 @@ internal class DeviceStateMonitor(
             addAction(Intent.ACTION_POWER_DISCONNECTED)
             addAction(Intent.ACTION_BATTERY_LOW)
             addAction(Intent.ACTION_BATTERY_OKAY)
+            addAction(Intent.ACTION_TIME_TICK)
             @Suppress("DEPRECATION")
             addAction(Intent.ACTION_DEVICE_STORAGE_LOW)
             @Suppress("DEPRECATION")

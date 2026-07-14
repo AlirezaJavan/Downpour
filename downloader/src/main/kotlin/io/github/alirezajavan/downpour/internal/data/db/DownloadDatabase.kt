@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DownloadEntity::class, DownloadPartEntity::class],
-    version = 6,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +48,24 @@ internal abstract class DownloadDatabase : RoomDatabase() {
             object : Migration(5, 6) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE downloads ADD COLUMN effectiveConnections INTEGER NOT NULL DEFAULT -1")
+                }
+            }
+
+        // Adds scheduling window support. nullable Ints (scheduleStartMinuteOfDay,
+        // scheduleEndMinuteOfDay) representing the local time window for the download.
+        val MIGRATION_6_7 =
+            object : Migration(6, 7) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN scheduleStartMinuteOfDay INTEGER")
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN scheduleEndMinuteOfDay INTEGER")
+                }
+            }
+
+        // Adds date-based scheduling support (scheduledAtMillis).
+        val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE downloads ADD COLUMN scheduledAtMillis INTEGER")
                 }
             }
     }

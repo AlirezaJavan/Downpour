@@ -67,18 +67,24 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 ---
 
 ## Phase 7: Scheduling & Automation
-
 *Focus: Let downloads run on a time window, not just a network/battery condition.*
 
 ### 7.1 Time-window scheduling
+*   **[x] Where**: `api/DownloadRequest.kt` (new builder option), `internal/device/DeviceStateMonitor.kt` (add a clock-based condition alongside existing network/battery/storage checks), `internal/engine/DownloadEngine.kt` (gate scheduling decisions).
+*   **[x] What**: Add `scheduleWindow(startHour, startMinute, endHour, endMinute)` (or a `LocalTime` range) to the request DSL, e.g. `scheduleWindow(2, 0, 6, 0)` meaning "only run between 2am–6am local time." Downloads outside the window enter (or add) a new `DownloadState.Scheduled` sub-state — reuse `WaitingForNetwork`'s reactive re-evaluation pattern rather than polling: register a `AlarmManager`/`WorkManager` one-shot trigger for the window start, and re-evaluate on each `DeviceStateMonitor` tick already in place.
+*   **[x] Persistence**: add `scheduleStartMinuteOfDay` / `scheduleEndMinuteOfDay` (nullable Int) columns to `DownloadEntity` with a Room migration (follow the pattern in `DownloadDatabaseMigrationTest.kt`).
+*   **[x] Interaction with existing constraints**: schedule window is ANDed with `NetworkType`/`requiresCharging`/etc — all must be satisfied simultaneously, consistent with how those are combined today.
+*   **[x] Tests**: `DownloadEngineStateTest.kt` — inject a fake clock, verify a download outside its window stays `Scheduled` and transitions to `Queued`/`Running` exactly at window start; verify a download already `Running` when its window closes pauses gracefully (same path as a lost network constraint).
+*   **[x] Acceptance**: `README.md` "Network & device constraints" section gets a matching example.
+*   **[x] Sample app**: add a time-window picker to the Constraints screen (Phase 11) so a request can be built with `scheduleWindow(...)`, and show the `Scheduled` state distinctly in the Downloads list.
 
-*   **Where**: `api/DownloadRequest.kt` (new builder option), `internal/device/DeviceStateMonitor.kt` (add a clock-based condition alongside existing network/battery/storage checks), `internal/engine/DownloadEngine.kt` (gate scheduling decisions).
-*   **What**: Add `scheduleWindow(startHour, startMinute, endHour, endMinute)` (or a `LocalTime` range) to the request DSL, e.g. `scheduleWindow(2, 0, 6, 0)` meaning "only run between 2am–6am local time." Downloads outside the window enter (or add) a new `DownloadState.Scheduled` sub-state — reuse `WaitingForNetwork`'s reactive re-evaluation pattern rather than polling: register a `AlarmManager`/`WorkManager` one-shot trigger for the window start, and re-evaluate on each `DeviceStateMonitor` tick already in place.
-*   **Persistence**: add `scheduleStartMinuteOfDay` / `scheduleEndMinuteOfDay` (nullable Int) columns to `DownloadEntity` with a Room migration (follow the pattern in `DownloadDatabaseMigrationTest.kt`).
-*   **Interaction with existing constraints**: schedule window is ANDed with `NetworkType`/`requiresCharging`/etc — all must be satisfied simultaneously, consistent with how those are combined today.
-*   **Tests**: `DownloadEngineStateTest.kt` — inject a fake clock, verify a download outside its window stays `Scheduled` and transitions to `Queued`/`Running` exactly at window start; verify a download already `Running` when its window closes pauses gracefully (same path as a lost network constraint).
-*   **Acceptance**: `README.md` "Network & device constraints" section gets a matching example.
-*   **[ ] Sample app**: add a time-window picker to the Constraints screen (Phase 11) so a request can be built with `scheduleWindow(...)`, and show the `Scheduled` state distinctly in the Downloads list.
+### 7.2 Date-based scheduling (One-time)
+*   **[x] Where**: `api/DownloadRequest.kt`, `internal/data/db/DownloadEntity.kt`, `internal/engine/DownloadEngine.kt`.
+*   **[x] What**: Add `scheduleAt(timestampMillis)` to the request builder. If set, the download remains in `Scheduled` state until `System.currentTimeMillis() >= scheduledAtMillis`.
+*   **[x] Interaction**: If both a daily window and a specific date are set, the download waits until the date is reached AND the current time is within the daily window.
+*   **[x] Persistence**: add `scheduledAtMillis` (nullable Long) to `DownloadEntity` with a Room migration.
+*   **[x] Tests**: `DownloadEngineStateTest.kt` — verify a download with `scheduleAt` stays `Scheduled` until the timestamp is reached.
+*   **[x] Sample app**: add a Date/Time picker for "Schedule start" in the New Download sheet.
 
 ---
 
