@@ -8,6 +8,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.storage.StorageManager
 import androidx.core.content.ContextCompat
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -25,9 +26,7 @@ internal data class DeviceState(
         requiresCharging: Boolean,
         requiresBatteryNotLow: Boolean,
         requiresStorageNotLow: Boolean,
-        scheduleStart: Int?,
-        scheduleEnd: Int?,
-        scheduledAt: Long?,
+        schedule: DownloadSchedule,
     ): Boolean {
         val deviceSatisfied =
             (!requiresCharging || isCharging) &&
@@ -36,16 +35,18 @@ internal data class DeviceState(
 
         if (!deviceSatisfied) return false
 
-        if (scheduledAt != null && currentTimeMillis < scheduledAt) {
+        if (schedule.scheduledAtMillis != null && currentTimeMillis < schedule.scheduledAtMillis) {
             return false
         }
 
-        if (scheduleStart != null && scheduleEnd != null) {
-            return if (scheduleStart < scheduleEnd) {
-                currentTimeMinuteOfDay in scheduleStart until scheduleEnd
+        if (schedule.hasWindow) {
+            val start = schedule.scheduleStartMinuteOfDay!!
+            val end = schedule.scheduleEndMinuteOfDay!!
+            return if (start < end) {
+                currentTimeMinuteOfDay in start until end
             } else {
                 // Window crosses midnight (e.g. 22:00 to 06:00)
-                currentTimeMinuteOfDay >= scheduleStart || currentTimeMinuteOfDay < scheduleEnd
+                currentTimeMinuteOfDay !in end..<start
             }
         }
 

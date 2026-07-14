@@ -50,7 +50,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.alirezajavan:downpour:0.6.0")
+    implementation("io.github.alirezajavan:downpour:0.7.0")
 }
 ```
 

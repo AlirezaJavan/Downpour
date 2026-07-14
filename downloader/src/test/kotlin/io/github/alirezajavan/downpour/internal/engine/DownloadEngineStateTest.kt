@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadPostProcessor
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -344,8 +345,11 @@ class DownloadEngineStateTest {
             // Window is 2 AM to 6 AM (120 to 360 minutes)
             val entity =
                 entity("a").copy(
-                    scheduleStartMinuteOfDay = 120,
-                    scheduleEndMinuteOfDay = 360,
+                    schedule =
+                        DownloadSchedule(
+                            scheduleStartMinuteOfDay = 120,
+                            scheduleEndMinuteOfDay = 360,
+                        ),
                 )
             repository.insert(entity)
 
@@ -374,7 +378,7 @@ class DownloadEngineStateTest {
     fun `scheduleAt keeps a download scheduled until the specific timestamp is reached`() =
         runTest(UnconfinedTestDispatcher()) {
             val scheduledTime = NOW + 10_000
-            val entity = entity("a").copy(scheduledAtMillis = scheduledTime)
+            val entity = entity("a").copy(schedule = DownloadSchedule(scheduledAtMillis = scheduledTime))
             repository.insert(entity)
 
             // Current time is NOW
@@ -418,6 +422,7 @@ class DownloadEngineStateTest {
         initialBackoffMillis = initialBackoffMillis,
         backoffMultiplier = 2.0,
         maxBackoffMillis = 60_000,
+        schedule = DownloadSchedule(),
         status = DownloadStatus.QUEUED,
         downloadedBytes = 0,
         totalBytes = 100,

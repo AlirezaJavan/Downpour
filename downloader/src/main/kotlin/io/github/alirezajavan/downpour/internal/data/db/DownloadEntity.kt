@@ -1,7 +1,9 @@
 package io.github.alirezajavan.downpour.internal.data.db
 
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 
 @Entity(tableName = "downloads")
@@ -26,9 +28,7 @@ internal data class DownloadEntity(
     val requiresCharging: Boolean = false,
     val requiresBatteryNotLow: Boolean = false,
     val requiresStorageNotLow: Boolean = false,
-    val scheduleStartMinuteOfDay: Int? = null,
-    val scheduleEndMinuteOfDay: Int? = null,
-    val scheduledAtMillis: Long? = null,
+    @Embedded val schedule: DownloadSchedule,
     val maxConnections: Int,
     val effectiveConnections: Int = -1,
     val maxBytesPerSecond: Long,

@@ -3,6 +3,7 @@ package io.github.alirezajavan.downpour.internal.data
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.db.DownloadDatabase
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import kotlinx.coroutines.test.runTest
@@ -111,6 +112,7 @@ class DownloadRepositoryTest {
             initialBackoffMillis = 0,
             backoffMultiplier = 0.0,
             maxBackoffMillis = 0,
+            schedule = DownloadSchedule(),
             status = DownloadStatus.QUEUED,
             downloadedBytes = 0,
             totalBytes = 0,

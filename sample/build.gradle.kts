@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.alirezajavan.downpour.sample"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.7.0"
     }
 
     buildTypes {

@@ -18,9 +18,7 @@ public class DownloadRequest private constructor(
     public val requiresCharging: Boolean,
     public val requiresBatteryNotLow: Boolean,
     public val requiresStorageNotLow: Boolean,
-    public val scheduleStartMinuteOfDay: Int?,
-    public val scheduleEndMinuteOfDay: Int?,
-    public val scheduledAtMillis: Long?,
+    public val schedule: DownloadSchedule,
 ) {
     @Deprecated("Use destination instead", ReplaceWith("destination"))
     public val destinationPath: String
@@ -48,9 +46,7 @@ public class DownloadRequest private constructor(
         private var requiresCharging: Boolean = false
         private var requiresBatteryNotLow: Boolean = false
         private var requiresStorageNotLow: Boolean = false
-        private var scheduleStartMinuteOfDay: Int? = null
-        private var scheduleEndMinuteOfDay: Int? = null
-        private var scheduledAtMillis: Long? = null
+        private var schedule: DownloadSchedule = DownloadSchedule()
 
         public fun header(
             name: String,
@@ -108,11 +104,17 @@ public class DownloadRequest private constructor(
                 require(startMinute in 0..59) { "startMinute must be in 0..59" }
                 require(endHour in 0..23) { "endHour must be in 0..23" }
                 require(endMinute in 0..59) { "endMinute must be in 0..59" }
-                this.scheduleStartMinuteOfDay = startHour * 60 + startMinute
-                this.scheduleEndMinuteOfDay = endHour * 60 + endMinute
+                this.schedule =
+                    this.schedule.copy(
+                        scheduleStartMinuteOfDay = startHour * 60 + startMinute,
+                        scheduleEndMinuteOfDay = endHour * 60 + endMinute,
+                    )
             }
 
-        public fun scheduleAt(timestampMillis: Long): Builder = apply { this.scheduledAtMillis = timestampMillis }
+        public fun scheduleAt(timestampMillis: Long): Builder =
+            apply {
+                this.schedule = this.schedule.copy(scheduledAtMillis = timestampMillis)
+            }
 
         public fun metadata(
             key: String,
@@ -139,9 +141,7 @@ public class DownloadRequest private constructor(
                 requiresCharging = requiresCharging,
                 requiresBatteryNotLow = requiresBatteryNotLow,
                 requiresStorageNotLow = requiresStorageNotLow,
-                scheduleStartMinuteOfDay = scheduleStartMinuteOfDay,
-                scheduleEndMinuteOfDay = scheduleEndMinuteOfDay,
-                scheduledAtMillis = scheduledAtMillis,
+                schedule = schedule,
             )
         }
     }

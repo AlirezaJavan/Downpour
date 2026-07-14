@@ -30,8 +30,8 @@ class DownloadRequestTest {
                 .scheduleWindow(2, 30, 6, 45)
                 .build()
 
-        assertThat(request.scheduleStartMinuteOfDay).isEqualTo(2 * 60 + 30)
-        assertThat(request.scheduleEndMinuteOfDay).isEqualTo(6 * 60 + 45)
+        assertThat(request.schedule.scheduleStartMinuteOfDay).isEqualTo(2 * 60 + 30)
+        assertThat(request.schedule.scheduleEndMinuteOfDay).isEqualTo(6 * 60 + 45)
     }
 
     @Test

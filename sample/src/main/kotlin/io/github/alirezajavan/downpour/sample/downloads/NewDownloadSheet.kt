@@ -231,19 +231,27 @@ fun NewDownloadSheet(
                     ) {
                         TimeInput(
                             label = "Start",
-                            hour = form.scheduleStartHour,
-                            minute = form.scheduleStartMinute,
+                            hour = form.schedule.scheduleStartMinuteOfDay?.let { it / 60 },
+                            minute = form.schedule.scheduleStartMinuteOfDay?.let { it % 60 },
                             onTimeChange = { h, m ->
-                                form = form.copy(scheduleStartHour = h, scheduleStartMinute = m)
+                                val minuteOfDay = if (h != null && m != null) h * 60 + m else null
+                                form =
+                                    form.copy(
+                                        schedule = form.schedule.copy(scheduleStartMinuteOfDay = minuteOfDay),
+                                    )
                             },
                             modifier = Modifier.weight(1f),
                         )
                         TimeInput(
                             label = "End",
-                            hour = form.scheduleEndHour,
-                            minute = form.scheduleEndMinute,
+                            hour = form.schedule.scheduleEndMinuteOfDay?.let { it / 60 },
+                            minute = form.schedule.scheduleEndMinuteOfDay?.let { it % 60 },
                             onTimeChange = { h, m ->
-                                form = form.copy(scheduleEndHour = h, scheduleEndMinute = m)
+                                val minuteOfDay = if (h != null && m != null) h * 60 + m else null
+                                form =
+                                    form.copy(
+                                        schedule = form.schedule.copy(scheduleEndMinuteOfDay = minuteOfDay),
+                                    )
                             },
                             modifier = Modifier.weight(1f),
                         )
@@ -257,8 +265,10 @@ fun NewDownloadSheet(
 
                 Section(title = "Schedule Start Date") {
                     DatePickerInput(
-                        selectedTimestamp = form.scheduledAtMillis,
-                        onTimestampChange = { form = form.copy(scheduledAtMillis = it) },
+                        selectedTimestamp = form.schedule.scheduledAtMillis,
+                        onTimestampChange = {
+                            form = form.copy(schedule = form.schedule.copy(scheduledAtMillis = it))
+                        },
                     )
                 }
             }

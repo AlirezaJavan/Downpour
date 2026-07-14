@@ -3,6 +3,7 @@ package io.github.alirezajavan.downpour.internal.engine
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
@@ -348,7 +349,7 @@ internal class DownloadEngine(
         val now = System.currentTimeMillis()
         val nextDelayMillis =
             scheduled.minOf { entity ->
-                val targetTime = calculateTargetTime(entity, now)
+                val targetTime = calculateTargetTime(entity.schedule, now)
                 (targetTime - now).coerceAtLeast(0)
             }
 
@@ -359,15 +360,15 @@ internal class DownloadEngine(
     }
 
     private fun calculateTargetTime(
-        entity: DownloadEntity,
+        schedule: DownloadSchedule,
         now: Long,
     ): Long {
-        val dateTarget = entity.scheduledAtMillis ?: now
+        val dateTarget = schedule.scheduledAtMillis ?: now
         val calendar = Calendar.getInstance().apply { timeInMillis = dateTarget }
         val minuteAtDateTarget = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
 
-        val start = entity.scheduleStartMinuteOfDay ?: return dateTarget
-        val end = entity.scheduleEndMinuteOfDay ?: return dateTarget
+        val start = schedule.scheduleStartMinuteOfDay ?: return dateTarget
+        val end = schedule.scheduleEndMinuteOfDay ?: return dateTarget
 
         // Is minuteAtDateTarget in window [start, end)?
         val inWindow =
@@ -375,7 +376,7 @@ internal class DownloadEngine(
                 minuteAtDateTarget in start until end
             } else {
                 // Window crosses midnight
-                minuteAtDateTarget >= start || minuteAtDateTarget < end
+                minuteAtDateTarget !in end..<start
             }
 
         if (inWindow && dateTarget >= now) return dateTarget
@@ -412,23 +413,22 @@ internal class DownloadEngine(
             entity.requiresCharging,
             entity.requiresBatteryNotLow,
             entity.requiresStorageNotLow,
-            entity.scheduleStartMinuteOfDay,
-            entity.scheduleEndMinuteOfDay,
-            entity.scheduledAtMillis,
+            entity.schedule,
         )
 
     private fun DeviceState.isTimeRestricted(entity: DownloadEntity): Boolean {
-        if (entity.scheduledAtMillis != null && currentTimeMillis < entity.scheduledAtMillis) {
+        val schedule = entity.schedule
+        if (schedule.scheduledAtMillis != null && currentTimeMillis < schedule.scheduledAtMillis) {
             return true
         }
 
-        val start = entity.scheduleStartMinuteOfDay ?: return false
-        val end = entity.scheduleEndMinuteOfDay ?: return false
+        val start = schedule.scheduleStartMinuteOfDay ?: return false
+        val end = schedule.scheduleEndMinuteOfDay ?: return false
 
         return if (start < end) {
             currentTimeMinuteOfDay !in start until end
         } else {
-            currentTimeMinuteOfDay < start && currentTimeMinuteOfDay >= end
+            currentTimeMinuteOfDay in end..<start
         }
     }
 

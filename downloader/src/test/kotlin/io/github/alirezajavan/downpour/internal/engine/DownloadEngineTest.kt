@@ -1,6 +1,7 @@
 package io.github.alirezajavan.downpour.internal.engine
 
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -13,6 +14,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -93,6 +95,7 @@ class DownloadEngineTest {
             coVerify { repository.clearParts(id) }
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `engine starts adaptive tuning when enabled and download supports resume`() =
         runTest {
@@ -162,6 +165,7 @@ class DownloadEngineTest {
         initialBackoffMillis = 0,
         backoffMultiplier = 0.0,
         maxBackoffMillis = 0,
+        schedule = DownloadSchedule(),
         status = DownloadStatus.QUEUED,
         downloadedBytes = 0,
         totalBytes = 1000,

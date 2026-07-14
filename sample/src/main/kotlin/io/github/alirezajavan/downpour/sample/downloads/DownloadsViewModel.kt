@@ -47,18 +47,16 @@ class DownloadsViewModel(
                     .takeIf { it.isNotEmpty() }
                     ?.let { mirror(it) }
 
-                if (form.scheduleStartHour != null && form.scheduleStartMinute != null &&
-                    form.scheduleEndHour != null && form.scheduleEndMinute != null
-                ) {
+                if (form.schedule.hasWindow) {
                     scheduleWindow(
-                        form.scheduleStartHour,
-                        form.scheduleStartMinute,
-                        form.scheduleEndHour,
-                        form.scheduleEndMinute,
+                        form.schedule.scheduleStartMinuteOfDay!! / 60,
+                        form.schedule.scheduleStartMinuteOfDay!! % 60,
+                        form.schedule.scheduleEndMinuteOfDay!! / 60,
+                        form.schedule.scheduleEndMinuteOfDay!! % 60,
                     )
                 }
 
-                form.scheduledAtMillis?.let { scheduleAt(it) }
+                form.schedule.scheduledAtMillis?.let { scheduleAt(it) }
             },
         )
         SampleEvents.emit("Queued • ${form.fileName()}")
