@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadPostProcessor
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -41,6 +42,7 @@ class DownloadEngineStateTest {
     private val repository = DownloadRepository(dao) { NOW }
     private val networkMonitor = mockk<NetworkMonitor>()
     private val deviceStateMonitor = mockk<DeviceStateMonitor>()
+    private val scheduler = mockk<DownloadScheduler>(relaxed = true)
     private val fileStore = mockk<FileStore>(relaxed = true)
     private val serviceCounts = mutableListOf<Int>()
     private val serviceController = DownloadServiceController { serviceCounts += it }
@@ -63,6 +65,7 @@ class DownloadEngineStateTest {
         serviceController = serviceController,
         networkMonitor = networkMonitor,
         deviceStateMonitor = deviceStateMonitor,
+        scheduler = scheduler,
         fileStore = fileStore,
         logger = NoOpLogger,
     )
@@ -336,6 +339,42 @@ class DownloadEngineStateTest {
             assertThat(status("b")).isEqualTo(DownloadStatus.QUEUED)
         }
 
+    @Test
+    fun `schedule keeps a download scheduled until the time window starts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val startTime = NOW + 10_000
+            val endTime = NOW + 20_000
+            val entity =
+                entity("a").copy(
+                    schedule =
+                        DownloadSchedule(
+                            startTimeMillis = startTime,
+                            endTimeMillis = endTime,
+                        ),
+                )
+            repository.insert(entity)
+
+            // Current time is NOW (before start)
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = NOW)
+            val engine = newEngine(ScriptedRunner(repository, Behavior.Hang(progress = 0, total = 100)))
+
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
+
+            // Current time is between start and end
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = startTime + 1)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.RUNNING)
+
+            // Current time is after end
+            every { deviceStateMonitor.snapshot() } returns UNCONSTRAINED.copy(currentTimeMillis = endTime + 1)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("a")).isEqualTo(DownloadStatus.SCHEDULED)
+        }
+
     private fun entity(
         id: String,
         createdAt: Long = 0,
@@ -362,6 +401,7 @@ class DownloadEngineStateTest {
         initialBackoffMillis = initialBackoffMillis,
         backoffMultiplier = 2.0,
         maxBackoffMillis = 60_000,
+        schedule = DownloadSchedule(),
         status = DownloadStatus.QUEUED,
         downloadedBytes = 0,
         totalBytes = 100,
@@ -427,6 +467,12 @@ class DownloadEngineStateTest {
         const val NOW = 1_000L
         val CONNECTED = NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
         val DISCONNECTED = NetworkStatus(isConnected = false, isMetered = true, isNotRoaming = false)
-        val UNCONSTRAINED = DeviceState(isCharging = false, isBatteryLow = false, isStorageLow = false)
+        val UNCONSTRAINED =
+            DeviceState(
+                isCharging = false,
+                isBatteryLow = false,
+                isStorageLow = false,
+                currentTimeMillis = NOW,
+            )
     }
 }

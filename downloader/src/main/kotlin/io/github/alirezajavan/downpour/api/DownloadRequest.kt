@@ -18,6 +18,7 @@ public class DownloadRequest private constructor(
     public val requiresCharging: Boolean,
     public val requiresBatteryNotLow: Boolean,
     public val requiresStorageNotLow: Boolean,
+    public val schedule: DownloadSchedule,
 ) {
     @Deprecated("Use destination instead", ReplaceWith("destination"))
     public val destinationPath: String
@@ -45,6 +46,7 @@ public class DownloadRequest private constructor(
         private var requiresCharging: Boolean = false
         private var requiresBatteryNotLow: Boolean = false
         private var requiresStorageNotLow: Boolean = false
+        private var schedule: DownloadSchedule = DownloadSchedule()
 
         public fun header(
             name: String,
@@ -91,6 +93,22 @@ public class DownloadRequest private constructor(
 
         public fun requiresStorageNotLow(required: Boolean): Builder = apply { this.requiresStorageNotLow = required }
 
+        public fun schedule(
+            startTimeMillis: Long,
+            endTimeMillis: Long? = null,
+        ): Builder =
+            apply {
+                if (endTimeMillis != null) {
+                    require(endTimeMillis > startTimeMillis) { "endTimeMillis must be after startTimeMillis" }
+                }
+                this.schedule = DownloadSchedule(startTimeMillis, endTimeMillis)
+            }
+
+        public fun scheduleAt(timestampMillis: Long): Builder =
+            apply {
+                this.schedule = DownloadSchedule(startTimeMillis = timestampMillis)
+            }
+
         public fun metadata(
             key: String,
             value: String,
@@ -116,6 +134,7 @@ public class DownloadRequest private constructor(
                 requiresCharging = requiresCharging,
                 requiresBatteryNotLow = requiresBatteryNotLow,
                 requiresStorageNotLow = requiresStorageNotLow,
+                schedule = schedule,
             )
         }
     }

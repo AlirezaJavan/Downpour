@@ -23,6 +23,27 @@ class DownloadRequestTest {
     }
 
     @Test
+    fun `schedule sets correct timestamps`() {
+        val start = 1000L
+        val end = 2000L
+        val request =
+            DownloadRequest
+                .Builder("https://example.com", "/path/to/file")
+                .schedule(start, end)
+                .build()
+
+        assertThat(request.schedule.startTimeMillis).isEqualTo(start)
+        assertThat(request.schedule.endTimeMillis).isEqualTo(end)
+    }
+
+    @Test
+    fun `schedule throws for invalid range`() {
+        assertThrows<IllegalArgumentException> {
+            DownloadRequest.Builder("u", "p").schedule(2000L, 1000L)
+        }
+    }
+
+    @Test
     fun `builder throws exception for blank url`() {
         assertThrows<IllegalArgumentException> {
             DownloadRequest.Builder("", "/path/to/file").build()

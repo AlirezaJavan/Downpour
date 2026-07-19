@@ -8,6 +8,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.storage.StorageManager
 import androidx.core.content.ContextCompat
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -17,15 +18,31 @@ internal data class DeviceState(
     val isCharging: Boolean,
     val isBatteryLow: Boolean,
     val isStorageLow: Boolean,
+    val currentTimeMillis: Long,
 ) {
     fun satisfies(
         requiresCharging: Boolean,
         requiresBatteryNotLow: Boolean,
         requiresStorageNotLow: Boolean,
-    ): Boolean =
-        (!requiresCharging || isCharging) &&
-            (!requiresBatteryNotLow || !isBatteryLow) &&
-            (!requiresStorageNotLow || !isStorageLow)
+        schedule: DownloadSchedule,
+    ): Boolean {
+        val deviceSatisfied =
+            (!requiresCharging || isCharging) &&
+                (!requiresBatteryNotLow || !isBatteryLow) &&
+                (!requiresStorageNotLow || !isStorageLow)
+
+        if (!deviceSatisfied) return false
+
+        if (schedule.startTimeMillis != null && currentTimeMillis < schedule.startTimeMillis) {
+            return false
+        }
+
+        if (schedule.endTimeMillis != null && currentTimeMillis >= schedule.endTimeMillis) {
+            return false
+        }
+
+        return true
+    }
 }
 
 internal class DeviceStateMonitor(
@@ -37,6 +54,7 @@ internal class DeviceStateMonitor(
             isCharging = battery.isCharging(),
             isBatteryLow = battery.batteryFraction() <= BATTERY_LOW_FRACTION,
             isStorageLow = checkStorageLow(),
+            currentTimeMillis = System.currentTimeMillis(),
         )
     }
 
@@ -80,6 +98,7 @@ internal class DeviceStateMonitor(
             addAction(Intent.ACTION_POWER_DISCONNECTED)
             addAction(Intent.ACTION_BATTERY_LOW)
             addAction(Intent.ACTION_BATTERY_OKAY)
+            addAction(Intent.ACTION_TIME_TICK)
             @Suppress("DEPRECATION")
             addAction(Intent.ACTION_DEVICE_STORAGE_LOW)
             @Suppress("DEPRECATION")

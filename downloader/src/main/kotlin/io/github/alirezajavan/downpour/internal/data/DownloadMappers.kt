@@ -40,6 +40,7 @@ internal fun DownloadRequest.toEntity(
         requiresCharging = requiresCharging,
         requiresBatteryNotLow = requiresBatteryNotLow,
         requiresStorageNotLow = requiresStorageNotLow,
+        schedule = schedule,
         maxConnections = maxConnections,
         maxBytesPerSecond = maxBytesPerSecond,
         checksumAlgorithm = checksum?.algorithm?.ordinal,
@@ -114,6 +115,10 @@ internal fun DownloadEntity.toState(): DownloadState =
 
         DownloadStatus.WAITING_FOR_NETWORK -> {
             DownloadState.WaitingForNetwork
+        }
+
+        DownloadStatus.SCHEDULED -> {
+            DownloadState.Scheduled
         }
 
         DownloadStatus.FAILED -> {

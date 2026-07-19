@@ -2,6 +2,7 @@ package io.github.alirezajavan.downpour.internal.engine
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -116,6 +117,7 @@ class DownloadTaskTest {
             initialBackoffMillis = 0,
             backoffMultiplier = 0.0,
             maxBackoffMillis = 0,
+            schedule = DownloadSchedule(),
             status = DownloadStatus.QUEUED,
             downloadedBytes = 0,
             totalBytes = 100,

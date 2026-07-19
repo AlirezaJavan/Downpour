@@ -1,6 +1,7 @@
 package io.github.alirezajavan.downpour.internal.engine
 
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -13,6 +14,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -25,6 +27,7 @@ class DownloadEngineTest {
     private val serviceController = mockk<DownloadServiceController>(relaxed = true)
     private val networkMonitor = mockk<NetworkMonitor>(relaxed = true)
     private val deviceStateMonitor = mockk<DeviceStateMonitor>(relaxed = true)
+    private val scheduler = mockk<DownloadScheduler>(relaxed = true)
     private val fileStore = mockk<FileStore>(relaxed = true)
 
     private val engine =
@@ -36,6 +39,7 @@ class DownloadEngineTest {
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             deviceStateMonitor = deviceStateMonitor,
+            scheduler = scheduler,
             fileStore = fileStore,
             logger = NoOpLogger,
         )
@@ -91,6 +95,7 @@ class DownloadEngineTest {
             coVerify { repository.clearParts(id) }
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `engine starts adaptive tuning when enabled and download supports resume`() =
         runTest {
@@ -104,6 +109,7 @@ class DownloadEngineTest {
                     serviceController = serviceController,
                     networkMonitor = networkMonitor,
                     deviceStateMonitor = deviceStateMonitor,
+                    scheduler = scheduler,
                     fileStore = fileStore,
                     logger = NoOpLogger,
                 )
@@ -112,7 +118,13 @@ class DownloadEngineTest {
             coEvery { repository.nextQueued(any()) } returns listOf(entity)
             coEvery { repository.getEntity("id") } returns entity
             every { networkMonitor.snapshot() } returns NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
-            every { deviceStateMonitor.snapshot() } returns DeviceState(isCharging = false, isBatteryLow = false, isStorageLow = false)
+            every { deviceStateMonitor.snapshot() } returns
+                DeviceState(
+                    isCharging = false,
+                    isBatteryLow = false,
+                    isStorageLow = false,
+                    currentTimeMillis = 0,
+                )
             val runner = mockk<DownloadTaskRunner>(relaxed = true)
             // Keep the task "running" for the duration of the test -- a relaxed mock that returns
             // immediately would complete the job inline and cancel adaptive tuning before it ever
@@ -152,6 +164,7 @@ class DownloadEngineTest {
         initialBackoffMillis = 0,
         backoffMultiplier = 0.0,
         maxBackoffMillis = 0,
+        schedule = DownloadSchedule(),
         status = DownloadStatus.QUEUED,
         downloadedBytes = 0,
         totalBytes = 1000,

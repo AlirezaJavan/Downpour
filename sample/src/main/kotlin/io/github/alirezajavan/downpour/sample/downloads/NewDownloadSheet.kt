@@ -32,13 +32,17 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
@@ -46,6 +50,10 @@ import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 private data class Preset(
     val label: String,
@@ -215,6 +223,28 @@ fun NewDownloadSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                Section(title = "Schedule") {
+                    DatePickerInput(
+                        label = "Start at",
+                        selectedTimestamp = form.schedule.startTimeMillis,
+                        onTimestampChange = {
+                            form = form.copy(schedule = form.schedule.copy(startTimeMillis = it))
+                        },
+                    )
+                    DatePickerInput(
+                        label = "Stop at",
+                        selectedTimestamp = form.schedule.endTimeMillis,
+                        onTimestampChange = {
+                            form = form.copy(schedule = form.schedule.copy(endTimeMillis = it))
+                        },
+                    )
+                    Text(
+                        "Leave empty to start immediately. Stop time is optional.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Button(
@@ -222,6 +252,66 @@ fun NewDownloadSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Start download")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DatePickerInput(
+    label: String,
+    selectedTimestamp: Long?,
+    onTimestampChange: (Long?) -> Unit,
+) {
+    val context = LocalContext.current
+    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val text by remember(selectedTimestamp) {
+        derivedStateOf {
+            selectedTimestamp?.let { formatter.format(Date(it)) } ?: "Not set"
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.weight(1f),
+            label = { Text(label) },
+        )
+        TextButton(onClick = {
+            val now = Calendar.getInstance()
+            android.app
+                .DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth ->
+                        android.app
+                            .TimePickerDialog(
+                                context,
+                                { _, hourOfDay, minute ->
+                                    val calendar = Calendar.getInstance()
+                                    calendar.set(year, month, dayOfMonth, hourOfDay, minute)
+                                    onTimestampChange(calendar.timeInMillis)
+                                },
+                                now.get(Calendar.HOUR_OF_DAY),
+                                now.get(Calendar.MINUTE),
+                                true,
+                            ).show()
+                    },
+                    now.get(Calendar.YEAR),
+                    now.get(Calendar.MONTH),
+                    now.get(Calendar.DAY_OF_MONTH),
+                ).show()
+        }) {
+            Text("Pick")
+        }
+        if (selectedTimestamp != null) {
+            TextButton(onClick = { onTimestampChange(null) }) {
+                Text("Clear")
             }
         }
     }

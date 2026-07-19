@@ -2,6 +2,7 @@ package io.github.alirezajavan.downpour.sample.downloads
 
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.ConflictStrategy
+import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
@@ -20,6 +21,7 @@ data class NewDownloadForm(
     val checksumAlgorithm: ChecksumAlgorithm = ChecksumAlgorithm.SHA256,
     val checksumHex: String = "",
     val mirrorUrl: String = "",
+    val schedule: DownloadSchedule = DownloadSchedule(),
 ) {
     fun fileName(): String = url.substringAfterLast('/').ifBlank { "download_${System.currentTimeMillis()}" }
 }

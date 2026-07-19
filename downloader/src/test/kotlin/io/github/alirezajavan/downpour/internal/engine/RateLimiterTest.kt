@@ -1,6 +1,8 @@
 package io.github.alirezajavan.downpour.internal.engine
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
@@ -21,6 +23,7 @@ class RateLimiterTest {
             limiter.acquire(1000) // Should not suspend
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `concurrent callers sharing a limiter do not exceed the aggregate cap`() =
         runTest {
@@ -40,7 +43,7 @@ class RateLimiterTest {
                         repeat(chunksPerCaller) { limiter.acquire(chunk) }
                     }
                 }
-            jobs.forEach { it.join() }
+            jobs.joinAll()
 
             val totalBytes = callerCount.toLong() * chunksPerCaller * chunk
             val elapsedSeconds = currentTime / 1000.0

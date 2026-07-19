@@ -46,6 +46,10 @@ class DownloadsViewModel(
                     .trim()
                     .takeIf { it.isNotEmpty() }
                     ?.let { mirror(it) }
+
+                form.schedule.startTimeMillis?.let { start ->
+                    schedule(start, form.schedule.endTimeMillis)
+                }
             },
         )
         SampleEvents.emit("Queued • ${form.fileName()}")
