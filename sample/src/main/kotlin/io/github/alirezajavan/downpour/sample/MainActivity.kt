@@ -1,14 +1,25 @@
 package io.github.alirezajavan.downpour.sample
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -19,8 +30,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -37,29 +53,102 @@ import io.github.alirezajavan.downpour.sample.settings.SettingsScreen
 import io.github.alirezajavan.downpour.sample.theme.DownpourSampleTheme
 
 class MainActivity : ComponentActivity() {
+    private var permissionsGranted by mutableStateOf(false)
+
     private val requestNotificationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { checkPermissions() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ensureNotificationPermission()
+        checkPermissions()
         setContent {
             DownpourSampleTheme {
-                Surface(modifier = Modifier) {
-                    SampleApp()
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    if (permissionsGranted) {
+                        SampleApp()
+                    } else {
+                        PermissionGate(
+                            onGrantNotifications = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            },
+                            onGrantAlarms = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    val intent =
+                                        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                            data = Uri.fromParts("package", packageName, null)
+                                        }
+                                    startActivity(intent)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
     }
 
-    // On Android 13+ the download foreground-service notification is hidden unless the user has
-    // granted POST_NOTIFICATIONS. Request it so progress/pause/cancel are actually visible.
-    private fun ensureNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted =
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-        if (!granted) requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    override fun onResume() {
+        super.onResume()
+        checkPermissions()
+    }
+
+    private fun checkPermissions() {
+        val notificationsGranted =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        val alarmsGranted =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val alarmManager = getSystemService(AlarmManager::class.java)
+                alarmManager.canScheduleExactAlarms()
+            } else {
+                true
+            }
+
+        permissionsGranted = notificationsGranted && alarmsGranted
+    }
+}
+
+@Composable
+private fun PermissionGate(
+    onGrantNotifications: () -> Unit,
+    onGrantAlarms: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Permissions Required",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Downpour needs Notification and Exact Alarm permissions to manage downloads reliably in the background.",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(onClick = onGrantNotifications) {
+            Text("Grant Notification Permission")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onGrantAlarms) {
+            Text("Grant Exact Alarm Permission")
+        }
     }
 }
 

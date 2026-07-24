@@ -1,5 +1,8 @@
 package io.github.alirezajavan.downpour.api
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 public data class DownloadItem(
     val id: String,
     val url: String,

@@ -198,6 +198,16 @@ internal interface DownloadDao {
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun delete(id: String)
 
+    @Query(
+        "SELECT id FROM downloads WHERE url = :url AND destinationPath = :path " +
+            "AND status NOT IN (:terminal) LIMIT 1",
+    )
+    suspend fun findNonTerminalByUrlAndPath(
+        url: String,
+        path: String,
+        terminal: List<DownloadStatus>,
+    ): String?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertParts(parts: List<DownloadPartEntity>)
 

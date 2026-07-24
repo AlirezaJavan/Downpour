@@ -265,11 +265,10 @@ private fun DatePickerInput(
 ) {
     val context = LocalContext.current
     val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
-    val text by remember(selectedTimestamp) {
-        derivedStateOf {
+    val text =
+        remember(selectedTimestamp) {
             selectedTimestamp?.let { formatter.format(Date(it)) } ?: "Not set"
         }
-    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),

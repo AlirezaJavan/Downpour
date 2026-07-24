@@ -5,8 +5,8 @@ import io.github.alirezajavan.downpour.api.FilenameResolver
 import io.github.alirezajavan.downpour.api.RemoteFileMetadata
 
 internal object DefaultFilenameResolver : FilenameResolver {
-    private const val DISPOSITION_FILENAME = "filename="
-    private const val DISPOSITION_FILENAME_STAR = "filename*="
+    private val FILENAME_REGEX = """(?i)filename\s*=\s*(?:"([^"]*)"|([^;\s]*)?)""".toRegex()
+    private val FILENAME_STAR_REGEX = """(?i)filename\*\s*=\s*([^\s']*)'([^\s']*)'\s*([^\s;]*)""".toRegex()
 
     override fun resolve(metadata: RemoteFileMetadata): String {
         val fromDisposition = metadata.contentDisposition?.let { parseDisposition(it) }
@@ -17,7 +17,7 @@ internal object DefaultFilenameResolver : FilenameResolver {
                 .substringAfterLast('/')
                 .substringBefore('?')
                 .substringBefore('#')
-        if (fromUrl.isNotBlank() && fromUrl.contains('.')) return fromUrl
+        if (fromUrl.isNotBlank() && fromUrl.contains('.')) return sanitizeFilename(fromUrl)
 
         val extension =
             metadata.contentType?.let {
@@ -25,21 +25,32 @@ internal object DefaultFilenameResolver : FilenameResolver {
             }
 
         val baseName = if (fromUrl.isNotBlank()) fromUrl else "download_${System.currentTimeMillis()}"
-        return if (!extension.isNullOrBlank()) "$baseName.$extension" else baseName
+        val sanitizedBase = sanitizeFilename(baseName)
+        return if (!extension.isNullOrBlank()) "$sanitizedBase.$extension" else sanitizedBase
     }
 
     private fun parseDisposition(disposition: String): String? {
-        // Simple parsing, could be improved for RFC 5987 (filename*)
-        return if (disposition.contains(DISPOSITION_FILENAME_STAR)) {
-            disposition.substringAfter(DISPOSITION_FILENAME_STAR).substringAfter("''").trim('"')
-        } else if (disposition.contains(DISPOSITION_FILENAME)) {
-            disposition
-                .substringAfter(DISPOSITION_FILENAME)
-                .substringBefore(';')
-                .trim()
-                .trim('"')
-        } else {
-            null
+        // Try filename* (RFC 5987) first as it has higher precedence
+        val starMatch = FILENAME_STAR_REGEX.find(disposition)
+        if (starMatch != null) {
+            val charsetName = starMatch.groupValues[1].ifBlank { "UTF-8" }
+            val encodedValue = starMatch.groupValues[3]
+            runCatching {
+                return sanitizeFilename(java.net.URLDecoder.decode(encodedValue, charsetName))
+            }
         }
+
+        val standardMatch = FILENAME_REGEX.find(disposition)
+        if (standardMatch != null) {
+            val quoted = standardMatch.groupValues[1]
+            val unquoted = standardMatch.groupValues[2]
+            val value = if (quoted.isNotEmpty()) quoted else unquoted
+            if (value.isNotBlank()) {
+                return sanitizeFilename(value)
+            }
+        }
+        return null
     }
+
+    private fun sanitizeFilename(filename: String): String = filename.replace('/', '_').replace('\\', '_').trim()
 }

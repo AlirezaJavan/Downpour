@@ -67,10 +67,10 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = viewModel()) {
                     Column {
                         DownloadItemCard(
                             item = item,
-                            onPause = viewModel::pause,
-                            onResume = viewModel::resume,
-                            onCancel = viewModel::cancel,
-                            onRemove = viewModel::remove,
+                            onPause = { id -> viewModel.pause(id) },
+                            onResume = { id -> viewModel.resume(id) },
+                            onCancel = { id -> viewModel.cancel(id) },
+                            onRemove = { id -> viewModel.remove(id) },
                         )
                         val state = item.state
                         if (state is DownloadState.Completed || (state is DownloadState.Failed && state.error.isRetryable)) {

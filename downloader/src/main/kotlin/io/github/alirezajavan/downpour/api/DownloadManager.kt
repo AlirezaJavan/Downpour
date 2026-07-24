@@ -63,4 +63,11 @@ public interface DownloadManager {
     public fun addListener(listener: DownloadListener)
 
     public fun removeListener(listener: DownloadListener)
+
+    public suspend fun exportQueue(): String
+
+    public suspend fun importQueue(
+        json: String,
+        conflictStrategy: ConflictStrategy = ConflictStrategy.OVERWRITE,
+    ): List<String>
 }

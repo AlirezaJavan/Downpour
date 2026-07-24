@@ -215,7 +215,7 @@ internal class DownloadTask(
         }
 
         if (!plan.hasKnownSize) return
-        val required = (plan.totalBytes - plan.alreadyDownloaded).coerceAtLeast(0)
+        val required = (plan.totalBytes - fileStore.lengthOf(destination)).coerceAtLeast(0)
         if (usable < required + MIN_SAFE_STORAGE_BYTES) {
             throw DownloadError.InsufficientStorage(required + MIN_SAFE_STORAGE_BYTES, usable)
         }

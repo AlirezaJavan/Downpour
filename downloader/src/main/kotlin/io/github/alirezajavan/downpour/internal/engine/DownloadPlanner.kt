@@ -111,9 +111,10 @@ internal class DownloadPlanner(
                 part.copy(index = index)
             }
         repository.replaceParts(reindexed)
+        val persistedParts = repository.getParts(entity.id).map { it.toPartPlan() }
         return DownloadPlan(
             info.totalBytes,
-            reindexed.map { it.toPartPlan() },
+            persistedParts,
             info.etag ?: info.lastModified,
             isMultiConnection = true,
         )
@@ -155,9 +156,10 @@ internal class DownloadPlanner(
                 part.copy(index = index)
             }
         repository.replaceParts(reindexed)
+        val persistedParts = repository.getParts(entity.id).map { it.toPartPlan() }
         return DownloadPlan(
             info.totalBytes,
-            reindexed.map { it.toPartPlan() },
+            persistedParts,
             info.etag ?: info.lastModified,
             isMultiConnection = true,
         )

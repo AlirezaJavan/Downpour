@@ -1,14 +1,27 @@
 package io.github.alirezajavan.downpour.internal
 
+import io.github.alirezajavan.downpour.api.Checksum
+import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
+import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.DiagnosticReport
+import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadItem
 import io.github.alirezajavan.downpour.api.DownloadListener
 import io.github.alirezajavan.downpour.api.DownloadManager
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadRequest
+import io.github.alirezajavan.downpour.api.DuplicatePolicy
 import io.github.alirezajavan.downpour.api.GroupProgress
+import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
+import io.github.alirezajavan.downpour.api.QueueSnapshot
+import io.github.alirezajavan.downpour.api.QueueSnapshotItem
+import io.github.alirezajavan.downpour.api.SerializableChecksum
+import io.github.alirezajavan.downpour.api.SerializableDownloadSchedule
+import io.github.alirezajavan.downpour.api.SerializableRetryPolicy
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
+import io.github.alirezajavan.downpour.internal.data.DownloadStatus
+import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.toDiagnosticReport
 import io.github.alirezajavan.downpour.internal.data.toEntity
 import io.github.alirezajavan.downpour.internal.engine.DownloadEngine
@@ -17,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultDownloadManager(
     private val repository: DownloadRepository,
@@ -34,6 +48,24 @@ internal class DefaultDownloadManager(
             config.interceptors.fold(request) { req, interceptor ->
                 interceptor.intercept(req)
             }
+
+        val policy = intercepted.duplicatePolicy ?: config.duplicatePolicy
+        if (policy == DuplicatePolicy.REUSE_EXISTING) {
+            val destinationPath =
+                when (val dest = intercepted.destination) {
+                    is DownloadDestination.File -> dest.path
+                    is DownloadDestination.Uri -> dest.uriString
+                }
+            val existingId =
+                kotlinx.coroutines.runBlocking(config.ioDispatcher) {
+                    repository.findNonTerminalByUrlAndPath(intercepted.url, destinationPath)
+                }
+            if (!existingId.isNullOrEmpty()) {
+                logger.i("Found existing non-terminal download $existingId for URL: ${intercepted.url}, reusing ID")
+                return existingId
+            }
+        }
+
         val id = idProvider()
         logger.i("Enqueued download $id for URL: ${intercepted.url}")
         scope.launch {
@@ -101,4 +133,110 @@ internal class DefaultDownloadManager(
     override fun addListener(listener: DownloadListener): Unit = eventDispatcher.add(listener)
 
     override fun removeListener(listener: DownloadListener): Unit = eventDispatcher.remove(listener)
+
+    override suspend fun exportQueue(): String {
+        val nonTerminalStatuses =
+            listOf(
+                DownloadStatus.QUEUED,
+                DownloadStatus.RUNNING,
+                DownloadStatus.PAUSED,
+                DownloadStatus.WAITING_FOR_NETWORK,
+                DownloadStatus.SCHEDULED,
+                DownloadStatus.FAILED,
+            )
+        val entities = repository.entitiesByStatuses(nonTerminalStatuses)
+        val items =
+            entities.map { entity ->
+                QueueSnapshotItem(
+                    url = entity.url,
+                    destinationPath = entity.destinationPath,
+                    destinationType = entity.destinationType,
+                    headers = entity.headers,
+                    priority = Priority.entries[entity.priority].name,
+                    conflictStrategy = ConflictStrategy.entries[entity.conflictStrategy].name,
+                    networkType = NetworkType.entries[entity.networkType].name,
+                    maxConnections = entity.maxConnections,
+                    retryPolicy =
+                        SerializableRetryPolicy(
+                            maxRetries = entity.maxRetries,
+                            initialBackoffMillis = entity.initialBackoffMillis,
+                            backoffMultiplier = entity.backoffMultiplier,
+                            maxBackoffMillis = entity.maxBackoffMillis,
+                        ),
+                    maxBytesPerSecond = entity.maxBytesPerSecond,
+                    checksum =
+                        entity.checksumAlgorithm?.let { algoOrdinal ->
+                            entity.checksumValue?.let { valHex ->
+                                SerializableChecksum(ChecksumAlgorithm.entries[algoOrdinal].name, valHex)
+                            }
+                        },
+                    tag = entity.tag,
+                    workerClass = entity.workerClass,
+                    metadata = entity.metadata,
+                    mirrors = entity.mirrors,
+                    requiresCharging = entity.requiresCharging,
+                    requiresBatteryNotLow = entity.requiresBatteryNotLow,
+                    requiresStorageNotLow = entity.requiresStorageNotLow,
+                    schedule =
+                        SerializableDownloadSchedule(
+                            startTimeMillis = entity.schedule.startTimeMillis,
+                            endTimeMillis = entity.schedule.endTimeMillis,
+                        ),
+                )
+            }
+        val snapshot = QueueSnapshot(items)
+        return kotlinx.serialization.json.Json
+            .encodeToString(QueueSnapshot.serializer(), snapshot)
+    }
+
+    override suspend fun importQueue(
+        json: String,
+        conflictStrategy: ConflictStrategy,
+    ): List<String> {
+        val snapshot =
+            kotlinx.serialization.json.Json
+                .decodeFromString(QueueSnapshot.serializer(), json)
+        val ids = mutableListOf<String>()
+        snapshot.items.forEach { item ->
+            val destination =
+                if (item.destinationType == 0) {
+                    DownloadDestination.File(item.destinationPath)
+                } else {
+                    DownloadDestination.Uri(item.destinationPath)
+                }
+            val request =
+                DownloadRequest
+                    .Builder(item.url, destination)
+                    .headers(item.headers)
+                    .priority(Priority.valueOf(item.priority))
+                    .conflictStrategy(conflictStrategy)
+                    .networkType(NetworkType.valueOf(item.networkType))
+                    .maxConnections(item.maxConnections)
+                    .retryPolicy(
+                        io.github.alirezajavan.downpour.api.RetryPolicy(
+                            maxRetries = item.retryPolicy.maxRetries,
+                            initialBackoff = item.retryPolicy.initialBackoffMillis.milliseconds,
+                            backoffMultiplier = item.retryPolicy.backoffMultiplier,
+                            maxBackoff = item.retryPolicy.maxBackoffMillis.milliseconds,
+                        ),
+                    ).maxBytesPerSecond(item.maxBytesPerSecond)
+                    .apply {
+                        item.checksum?.let { cs ->
+                            checksum(Checksum(ChecksumAlgorithm.valueOf(cs.algorithm), cs.expectedHex))
+                        }
+                        item.tag?.let { tag(it) }
+                        item.workerClass?.let { workerClass(it) }
+                        item.schedule.startTimeMillis?.let { start ->
+                            schedule(start, item.schedule.endTimeMillis)
+                        }
+                        item.metadata.forEach { (k, v) -> metadata(k, v) }
+                        item.mirrors.forEach { mirror(it) }
+                        requiresCharging(item.requiresCharging)
+                        requiresBatteryNotLow(item.requiresBatteryNotLow)
+                        requiresStorageNotLow(item.requiresStorageNotLow)
+                    }.build()
+            ids.add(enqueue(request))
+        }
+        return ids
+    }
 }
