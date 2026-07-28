@@ -200,14 +200,14 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **Tests**: sample app is a demo, not a library surface — no new unit-test obligations — but each new screen should get a manual pass noted in the PR description (this repo's `verify` skill / manual smoke test) since Compose UI here isn't under CI.
 
 ### Phase 11 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create a new feature/enhancement branch `feature/phase-11-sample-showcase`.
-    *   [ ] Full implementation of navigation and feature screens in the sample app.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with Sample app preview and features.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-11-sample-showcase`.
+    *   [x] Full implementation of navigation and feature screens in the sample app.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` comprehensively with Sample app preview and features.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 

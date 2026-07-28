@@ -8,6 +8,7 @@ import io.github.alirezajavan.downpour.api.Checksum
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadItem
 import io.github.alirezajavan.downpour.api.Downpour
+import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.api.downloadRequest
 import io.github.alirezajavan.downpour.sample.core.SampleDownpour
 import io.github.alirezajavan.downpour.sample.core.SampleEvents
@@ -81,6 +82,20 @@ class DownloadsViewModel(
     fun retry(id: String) = launch { manager.retry(id) }
 
     fun remove(id: String) = launch { manager.remove(id, deleteFile = true) }
+
+    fun setPriority(
+        id: String,
+        priority: Priority,
+    ) = launch {
+        manager.setPriority(id, priority)
+        SampleEvents.emit("Priority set to ${priority.name}")
+    }
+
+    fun moveToFront(id: String) =
+        launch {
+            manager.moveToFront(id)
+            SampleEvents.emit("Moved to front of queue")
+        }
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch { block() }

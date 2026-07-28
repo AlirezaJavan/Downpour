@@ -1,8 +1,9 @@
-package io.github.alirezajavan.downpour.sample.downloads
+package io.github.alirezajavan.downpour.sample.constraints
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,8 +25,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -33,9 +34,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,12 +45,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.DuplicatePolicy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
+import io.github.alirezajavan.downpour.sample.downloads.NewDownloadForm
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -84,27 +86,30 @@ private val PRESETS =
         },
     )
 
+@Suppress("LongMethod", "FunctionNaming")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewDownloadSheet(
-    onDismiss: () -> Unit,
-    onStart: (NewDownloadForm) -> Unit,
-) {
+fun ConstraintsScreen(viewModel: ConstraintsViewModel = viewModel()) {
     var form by remember { mutableStateOf(NewDownloadForm()) }
-    var advancedExpanded by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var advancedExpanded by remember { mutableStateOf(true) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("DSL & Constraints") }) },
+    ) { padding ->
         Column(
             modifier =
                 Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("New download", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Configure every DownloadRequest DSL option interactively before enqueuing.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(PRESETS) { preset ->
@@ -144,7 +149,7 @@ fun NewDownloadSheet(
                 }
             }
 
-            Section(title = "If file exists") {
+            Section(title = "If file exists (ConflictStrategy)") {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     ConflictStrategy.entries.forEachIndexed { index, strategy ->
                         SegmentedButton(
@@ -156,7 +161,7 @@ fun NewDownloadSheet(
                 }
             }
 
-            Section(title = "If duplicate enqueued") {
+            Section(title = "If duplicate enqueued (DuplicatePolicy)") {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     DuplicatePolicy.entries.forEachIndexed { index, policy ->
                         SegmentedButton(
@@ -168,7 +173,7 @@ fun NewDownloadSheet(
                 }
             }
 
-            Section(title = "Connections: ${form.maxConnections}") {
+            Section(title = "Max Connections: ${form.maxConnections}") {
                 Slider(
                     value = form.maxConnections.toFloat(),
                     onValueChange = { form = form.copy(maxConnections = it.toInt()) },
@@ -191,11 +196,11 @@ fun NewDownloadSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Advanced constraints", style = MaterialTheme.typography.titleMedium)
+                Text("Advanced constraints & schedule", style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = { advancedExpanded = !advancedExpanded }) {
                     Icon(
                         imageVector = if (advancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = "Toggle advanced options",
+                        contentDescription = "Toggle options",
                     )
                 }
             }
@@ -240,7 +245,7 @@ fun NewDownloadSheet(
                 OutlinedTextField(
                     value = form.checksumHex,
                     onValueChange = { form = form.copy(checksumHex = it) },
-                    label = { Text("Expected checksum (optional)") },
+                    label = { Text("Expected checksum (hex)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     modifier = Modifier.fillMaxWidth(),
@@ -248,44 +253,40 @@ fun NewDownloadSheet(
                 OutlinedTextField(
                     value = form.mirrorUrl,
                     onValueChange = { form = form.copy(mirrorUrl = it) },
-                    label = { Text("Fallback mirror URL (optional)") },
+                    label = { Text("Fallback mirror URL") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Section(title = "Schedule") {
+                Section(title = "Schedule Window") {
                     DatePickerInput(
-                        label = "Start at",
+                        label = "Start time",
                         selectedTimestamp = form.schedule.startTimeMillis,
                         onTimestampChange = {
                             form = form.copy(schedule = form.schedule.copy(startTimeMillis = it))
                         },
                     )
                     DatePickerInput(
-                        label = "Stop at",
+                        label = "End time",
                         selectedTimestamp = form.schedule.endTimeMillis,
                         onTimestampChange = {
                             form = form.copy(schedule = form.schedule.copy(endTimeMillis = it))
                         },
                     )
-                    Text(
-                        "Leave empty to start immediately. Stop time is optional.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
             Button(
-                onClick = { onStart(form) },
+                onClick = { viewModel.enqueue(form) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Start download")
+                Text("Enqueue Download with DSL Configuration")
             }
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun DatePickerInput(
     label: String,
@@ -345,6 +346,7 @@ private fun DatePickerInput(
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun Section(
     title: String,
@@ -356,6 +358,7 @@ private fun Section(
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun LabeledSwitch(
     label: String,

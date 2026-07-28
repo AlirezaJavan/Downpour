@@ -372,6 +372,16 @@ DownloadItemCard(
 )
 ```
 
+### Sample Showcase App
+
+The repository includes a comprehensive Material 3 showcase application (`:sample`) with a 5-destination navigation shell demonstrating every library feature:
+
+- **Downloads Screen**: Enqueue and observe active downloads using drop-in `DownloadItemCard`, handle lifecycle ops (Pause/Resume/Cancel/Retry/Remove), open completed files via `Downpour.getFileUri(...)`, and reorder items dynamically (`setPriority`, `moveToFront`).
+- **Tags & Groups Screen**: Observe group progress (`observeGroupProgress`), filter by tag, and perform bulk lifecycle operations (`pauseByTag`, `resumeByTag`, `cancelByTag`, `removeByTag`).
+- **DSL & Constraints Screen**: Interactive request builder exposing all `DownloadRequest` DSL parameters (NetworkType, charging/battery/storage constraints, checksum verification, fallback mirrors, conflict strategies, duplicate policy, and start/end schedule windows) with one-tap presets.
+- **Diagnostics Screen**: Inspect per-item connection-level part progress, retry history, HTTP headers, and resume support using `getDiagnosticReport(id)` and the Compose `DiagnosticsScreen`.
+- **Settings Screen**: Configure global bandwidth limits, concurrency count, adaptive connection tuning, logging, IPv4 preferences, and queue portability (`exportQueue`, `importQueue`) with live engine reconfiguration.
+
 ---
 
 ## Configuration Reference
