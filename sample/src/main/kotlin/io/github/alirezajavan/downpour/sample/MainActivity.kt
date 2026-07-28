@@ -44,6 +44,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.alirezajavan.downpour.sample.constraints.ConstraintsScreen
 import io.github.alirezajavan.downpour.sample.core.SampleEvents
 import io.github.alirezajavan.downpour.sample.diagnostics.DiagnosticsScreen
 import io.github.alirezajavan.downpour.sample.downloads.DownloadsScreen
@@ -172,6 +173,7 @@ private fun SampleApp() {
         ) {
             composable(Destination.Downloads.route) { DownloadsScreen() }
             composable(Destination.Groups.route) { GroupsScreen() }
+            composable(Destination.Constraints.route) { ConstraintsScreen() }
             composable(Destination.Diagnostics.route) { DiagnosticsScreen() }
             composable(Destination.Settings.route) { SettingsScreen() }
         }

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Troubleshoot
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** One entry per bottom-navigation tab, each showcasing a distinct slice of the library's API surface. */
@@ -17,11 +18,13 @@ sealed class Destination(
 
     data object Groups : Destination("groups", "Groups", Icons.Filled.Groups)
 
+    data object Constraints : Destination("constraints", "Constraints", Icons.Filled.Tune)
+
     data object Diagnostics : Destination("diagnostics", "Diagnostics", Icons.Filled.Troubleshoot)
 
     data object Settings : Destination("settings", "Settings", Icons.Filled.Settings)
 
     companion object {
-        val all = listOf(Downloads, Groups, Diagnostics, Settings)
+        val all = listOf(Downloads, Groups, Constraints, Diagnostics, Settings)
     }
 }

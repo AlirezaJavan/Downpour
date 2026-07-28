@@ -2,11 +2,13 @@ package io.github.alirezajavan.downpour.sample.core
 
 import android.content.Context
 import io.github.alirezajavan.downpour.api.DownloadListener
+import io.github.alirezajavan.downpour.api.DownloadLogger
 import io.github.alirezajavan.downpour.api.DownloadManager
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadPostProcessor
 import io.github.alirezajavan.downpour.api.DownloadState
 import io.github.alirezajavan.downpour.api.Downpour
+import io.github.alirezajavan.downpour.api.FilenameResolver
 import io.github.alirezajavan.downpour.api.HeaderProvider
 import kotlin.time.Duration.Companion.seconds
 
@@ -53,6 +55,21 @@ object SampleDownpour {
                 concurrencyReevaluationInterval = settings.reevaluationIntervalSeconds.seconds,
                 verbose = settings.verboseLogging,
                 preferIpv4 = settings.preferIpv4,
+                filenameResolver = FilenameResolver.Default,
+                logger =
+                    if (settings.verboseLogging) {
+                        object : DownloadLogger {
+                            override fun log(
+                                level: io.github.alirezajavan.downpour.api.LogLevel,
+                                message: String,
+                                throwable: Throwable?,
+                            ) {
+                                android.util.Log.d("DownpourSample", "[$level] $message", throwable)
+                            }
+                        }
+                    } else {
+                        null
+                    },
                 // Dynamic per-request auth headers, recomputed on every retry.
                 headerProvider = HeaderProvider { url -> mapOf("X-Sample-Token" to "demo-${url.hashCode().toUInt()}") },
                 // Post-processing hook -- runs after every completion.

@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -35,8 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.alirezajavan.downpour.api.DownloadState
+import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.compose.DownloadItemCard
 
+@Suppress("LongMethod", "FunctionNaming")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel = viewModel()) {
@@ -73,12 +77,46 @@ fun DownloadsScreen(viewModel: DownloadsViewModel = viewModel()) {
                             onRemove = { id -> viewModel.remove(id) },
                         )
                         val state = item.state
-                        if (state is DownloadState.Completed || (state is DownloadState.Failed && state.error.isRetryable)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (state !is DownloadState.Completed && state !is DownloadState.Cancelled) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(onClick = { viewModel.moveToFront(item.id) }) {
+                                        Text("Top Queue")
+                                    }
+                                    var priorityExpanded by remember { mutableStateOf(false) }
+                                    Box {
+                                        TextButton(onClick = { priorityExpanded = true }) {
+                                            Text("Priority: ${item.priority.name}")
+                                        }
+                                        DropdownMenu(
+                                            expanded = priorityExpanded,
+                                            onDismissRequest = { priorityExpanded = false },
+                                        ) {
+                                            Priority.entries.forEach { p ->
+                                                DropdownMenuItem(
+                                                    text = { Text(p.name) },
+                                                    onClick = {
+                                                        viewModel.setPriority(item.id, p)
+                                                        priorityExpanded = false
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Box {}
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 if (state is DownloadState.Completed) {
                                     TextButton(onClick = { viewModel.openFile(item) }) { Text("Open") }
                                 }
-                                if (state is DownloadState.Failed) {
+                                if (state is DownloadState.Failed && state.error.isRetryable) {
                                     TextButton(onClick = { viewModel.retry(item.id) }) { Text("Retry") }
                                 }
                             }
