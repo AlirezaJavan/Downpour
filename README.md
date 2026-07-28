@@ -204,6 +204,13 @@ DownloadManagerConfig(
 
 Bandwidth can be capped globally (`config.maxBytesPerSecond`) and per download (`maxBytesPerSecond { }`).
 
+### Dynamic Bandwidth Allocation & Thermal Safety
+
+- **Dynamic Priority-Weighted Bandwidth (`BandwidthDistributor`)**: When a global bandwidth limit (`config.maxBytesPerSecond`) is set, Downpour automatically calculates and distributes throughput shares among running downloads proportional to their `Priority` (`LOW` = 1x, `NORMAL` = 2x, `HIGH` = 4x). Bandwidth allocations update dynamically in real time as downloads start, complete, or change priority, while respecting individual per-download caps.
+- **Thermal Safety Throttling (`ThermalMonitor`)**: Downpour observes system thermal state changes via `PowerManager.OnThermalStatusChangedListener` (API 29+):
+  - **`MODERATE` / `SEVERE`**: Restricts concurrency to 1 active download and clamps part connection count to reduce device thermal load.
+  - **`CRITICAL` / `EMERGENCY` / `SHUTDOWN`**: Automatically pauses active downloads and places them back in the queue until the device cools down, resuming seamlessly once thermal status returns to `LIGHT` or `NONE`.
+
 ### Runtime queue control
 
 ```kotlin

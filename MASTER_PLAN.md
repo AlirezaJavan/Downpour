@@ -214,18 +214,18 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 ## Phase 12: Bandwidth Strategy & Thermal Safety
 *Focus: Optimize resource usage for device health and network fairness.*
 
-*   **[ ] Dynamic Bandwidth Allocation**: Implement a `BandwidthDistributor` that divides the global `maxBytesPerSecond` among active downloads based on their `Priority`.
-*   **[ ] Thermal Throttling**: Add a `ThermalMonitor` that listens to system thermal status and automatically reduces connection count or pauses downloads if the device enters `THERMAL_STATUS_MODERATE` or higher.
+*   **[x] Dynamic Bandwidth Allocation**: Implement a `BandwidthDistributor` that divides the global `maxBytesPerSecond` among active downloads based on their `Priority`.
+*   **[x] Thermal Throttling**: Add a `ThermalMonitor` that listens to system thermal status and automatically reduces connection count or pauses downloads if the device enters `THERMAL_STATUS_MODERATE` or higher.
 
 ### Phase 12 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create a new feature/enhancement branch `feature/phase-12-bandwidth-thermal`.
-    *   [ ] Implement bandwidth allocation logic and thermal listener.
-    *   [ ] Full test coverage (>90%) and all tests pass.
-    *   [ ] Build success (`assembleDebug`, `lint`).
-    *   [ ] Update `README.md` comprehensively with thermal and bandwidth configuration details.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-12-bandwidth-thermal`.
+    *   [x] Implement bandwidth allocation logic and thermal listener.
+    *   [x] Full test coverage (>90%) and all tests pass.
+    *   [x] Build success (`assembleDebug`, `lint`).
+    *   [x] Update `README.md` comprehensively with thermal and bandwidth configuration details.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 

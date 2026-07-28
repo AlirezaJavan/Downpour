@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
+@Suppress("LongParameterList")
 internal class DownloadTask(
     private val dataSource: HttpDownloadDataSource,
     private val planner: DownloadPlanner,
@@ -39,6 +40,7 @@ internal class DownloadTask(
     // Shared across all task instances: serializes destination resolution so two concurrent
     // downloads (e.g. the same URL enqueued twice) deterministically claim distinct filenames.
     private val destinationMutex: Mutex,
+    private val taskRateLimiter: RateLimiter? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : DownloadTaskRunner {
     override suspend fun run(entity: DownloadEntity): TaskResult =
@@ -235,9 +237,11 @@ internal class DownloadTask(
         verifyCompleteness(transfer)
     }
 
-    private fun rateLimitersFor(entity: DownloadEntity): List<RateLimiter> =
-        listOf(globalRateLimiter, RateLimiter(entity.maxBytesPerSecond))
-            .filterNot { it.isUnlimited }
+    private fun rateLimitersFor(entity: DownloadEntity): List<RateLimiter> {
+        val entityLimiter =
+            taskRateLimiter ?: RateLimiter(entity.maxBytesPerSecond).takeIf { !it.isUnlimited }
+        return listOfNotNull(globalRateLimiter, entityLimiter).filterNot { it.isUnlimited }
+    }
 
     private suspend fun runParts(transfer: ActiveTransfer) =
         coroutineScope {

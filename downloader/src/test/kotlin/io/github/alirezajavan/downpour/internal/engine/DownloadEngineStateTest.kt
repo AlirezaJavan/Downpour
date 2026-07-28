@@ -11,6 +11,9 @@ import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.data.db.FakeDownloadDao
 import io.github.alirezajavan.downpour.internal.device.DeviceState
 import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
+import io.github.alirezajavan.downpour.internal.device.FakeThermalMonitor
+import io.github.alirezajavan.downpour.internal.device.ThermalMonitor
+import io.github.alirezajavan.downpour.internal.device.ThermalState
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkStatus
 import io.github.alirezajavan.downpour.internal.util.NoOpLogger
@@ -57,6 +60,7 @@ class DownloadEngineStateTest {
     private fun TestScope.newEngine(
         runner: ScriptedRunner,
         config: DownloadManagerConfig = DownloadManagerConfig(),
+        thermalMonitor: ThermalMonitor = FakeThermalMonitor(),
     ) = DownloadEngine(
         scope = backgroundScope,
         repository = repository,
@@ -65,6 +69,7 @@ class DownloadEngineStateTest {
         serviceController = serviceController,
         networkMonitor = networkMonitor,
         deviceStateMonitor = deviceStateMonitor,
+        thermalMonitor = thermalMonitor,
         scheduler = scheduler,
         fileStore = fileStore,
         logger = NoOpLogger,
@@ -417,6 +422,31 @@ class DownloadEngineStateTest {
         createdAtMillis = createdAt,
         updatedAtMillis = createdAt,
     )
+
+    @Test
+    fun `critical thermal state pauses active downloads and recovers when cooled`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val runner = ScriptedRunner(repository, default = Behavior.Hang(progress = 500, total = 1000))
+            val thermalMonitor = FakeThermalMonitor(ThermalState.NONE)
+            val engine = newEngine(runner, thermalMonitor = thermalMonitor)
+
+            repository.insert(entity("id-thermal"))
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("id-thermal")).isEqualTo(DownloadStatus.RUNNING)
+
+            // Trigger critical thermal state
+            thermalMonitor.setThermalState(ThermalState.CRITICAL)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("id-thermal")).isEqualTo(DownloadStatus.QUEUED)
+
+            // Recovery when device cools down
+            thermalMonitor.setThermalState(ThermalState.NONE)
+            engine.onEnqueued()
+            advanceUntilIdle()
+            assertThat(status("id-thermal")).isEqualTo(DownloadStatus.RUNNING)
+        }
 
     private sealed interface Behavior {
         data class Succeed(
