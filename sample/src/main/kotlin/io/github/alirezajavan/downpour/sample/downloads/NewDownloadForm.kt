@@ -3,6 +3,7 @@ package io.github.alirezajavan.downpour.sample.downloads
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.api.DownloadSchedule
+import io.github.alirezajavan.downpour.api.DuplicatePolicy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
@@ -13,6 +14,7 @@ data class NewDownloadForm(
     val priority: Priority = Priority.NORMAL,
     val networkType: NetworkType = NetworkType.ANY,
     val conflictStrategy: ConflictStrategy = ConflictStrategy.RENAME,
+    val duplicatePolicy: DuplicatePolicy = DuplicatePolicy.REUSE_EXISTING,
     val maxConnections: Int = 4,
     val tag: String = "sample",
     val requiresCharging: Boolean = false,

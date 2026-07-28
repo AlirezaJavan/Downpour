@@ -56,12 +56,19 @@ internal class DefaultDownloadManager(
                     is DownloadDestination.File -> dest.path
                     is DownloadDestination.Uri -> dest.uriString
                 }
+
             val existingId =
                 kotlinx.coroutines.runBlocking(config.ioDispatcher) {
-                    repository.findNonTerminalByUrlAndPath(intercepted.url, destinationPath)
+                    val byUrl = repository.findNonTerminalByUrlAndPath(intercepted.url, destinationPath)
+                    if (byUrl != null) return@runBlocking byUrl
+
+                    intercepted.checksum?.let { cs ->
+                        repository.findNonTerminalByChecksum(cs.algorithm.ordinal, cs.expectedHex)
+                    }
                 }
+
             if (!existingId.isNullOrEmpty()) {
-                logger.i("Found existing non-terminal download $existingId for URL: ${intercepted.url}, reusing ID")
+                logger.i("Found existing non-terminal download $existingId for request, reusing ID")
                 return existingId
             }
         }

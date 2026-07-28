@@ -34,6 +34,7 @@ class DownloadsViewModel(
                 priority(form.priority)
                 networkType(form.networkType)
                 conflictStrategy(form.conflictStrategy)
+                duplicatePolicy(form.duplicatePolicy)
                 maxConnections(form.maxConnections)
                 tag(form.tag.ifBlank { "sample" })
                 requiresCharging(form.requiresCharging)

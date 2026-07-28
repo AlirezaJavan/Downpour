@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.ConflictStrategy
+import io.github.alirezajavan.downpour.api.DuplicatePolicy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.sample.core.SampleCatalog
@@ -135,6 +136,18 @@ fun NewDownloadSheet(
                             onClick = { form = form.copy(conflictStrategy = strategy) },
                             shape = SegmentedButtonDefaults.itemShape(index, ConflictStrategy.entries.size),
                         ) { Text(strategy.name) }
+                    }
+                }
+            }
+
+            Section(title = "If duplicate enqueued") {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    DuplicatePolicy.entries.forEachIndexed { index, policy ->
+                        SegmentedButton(
+                            selected = form.duplicatePolicy == policy,
+                            onClick = { form = form.copy(duplicatePolicy = policy) },
+                            shape = SegmentedButtonDefaults.itemShape(index, DuplicatePolicy.entries.size),
+                        ) { Text(policy.name) }
                     }
                 }
             }

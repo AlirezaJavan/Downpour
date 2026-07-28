@@ -91,6 +91,27 @@ class DefaultDownloadManagerTest {
         }
 
     @Test
+    fun `enqueue reuses existing id by checksum`() =
+        runTest {
+            val checksum =
+                io.github.alirezajavan.downpour.api
+                    .Checksum(ChecksumAlgorithm.SHA256, "hash")
+            val request =
+                DownloadRequest
+                    .Builder("https://example.com/new", "path")
+                    .checksum(checksum)
+                    .duplicatePolicy(DuplicatePolicy.REUSE_EXISTING)
+                    .build()
+            io.mockk.coEvery { repository.findNonTerminalByUrlAndPath(any(), any()) } returns null
+            io.mockk.coEvery { repository.findNonTerminalByChecksum(ChecksumAlgorithm.SHA256.ordinal, "hash") } returns "existing_id"
+
+            val id = manager.enqueue(request)
+
+            assertThat(id).isEqualTo("existing_id")
+            coVerify(exactly = 0) { repository.insert(any()) }
+        }
+
+    @Test
     fun `enqueue creates new id under ALLOW_DUPLICATE`() =
         runTest {
             val request =

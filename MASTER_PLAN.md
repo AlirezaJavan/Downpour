@@ -64,6 +64,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Acceptance**: a download on a simulated variable-bandwidth `HttpDownloadDataSource` fake converges to a stable connection count within the reevaluation window and never exceeds `maxConnections` or drops below `minConnections`.
 *   **[x] Sample app**: added an `adaptiveConcurrency` toggle plus `minConnections`/re-evaluation-interval sliders to the Settings screen. Since `Downpour.getInstance` is a process-wide singleton that ignores later config changes, "Apply & restart" persists the settings and relaunches the process rather than pretending a live rebuild is possible. **Remaining**: no per-item live effective-connection-count readout (would need a new field on `DiagnosticReport`/`DownloadItem`, out of scope for a sample-app-only change).
 
+### Phase 6 Workflow
+*   **[x] Steps**:
+    *   [x] Create feature branch `feature/phase-6-adaptive-performance`.
+    *   [x] Implementation of dynamic concurrency tuning and SpeedMeter reuse.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` with adaptive concurrency details.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
+
 ---
 
 ## Phase 7: Scheduling & Automation
@@ -86,6 +96,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Tests**: `DownloadEngineStateTest.kt` — verify a download with `scheduleAt` stays `Scheduled` until the timestamp is reached.
 *   **[x] Sample app**: add a Date/Time picker for "Schedule start" in the New Download sheet.
 
+### Phase 7 Workflow
+*   **[x] Steps**:
+    *   [x] Create feature branch `feature/phase-7-scheduling`.
+    *   [x] Implementation of time-window and date-based scheduling.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` with scheduling examples.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
+
 ---
 
 ## Phase 8: Data Portability & Dedup
@@ -100,20 +120,20 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### 8.2 Duplicate detection
 
-*   **Where**: `internal/DefaultDownloadManager.kt` (`enqueue`), `internal/data/DownloadRepository.kt` (add a lookup by URL+destination or checksum).
-*   **What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
-*   **Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
-*   **[ ] Sample app**: add Export/Import buttons (Settings screen, Phase 11) that call `exportQueue()`/`importQueue(...)` against a file in app-private storage, and enqueue the same URL twice from the UI to demonstrate `DuplicatePolicy.REUSE_EXISTING` returning the same id.
+*   **[x] Where**: `internal/DefaultDownloadManager.kt` (`enqueue`), `internal/data/DownloadRepository.kt` (add a lookup by URL+destination or checksum).
+*   **[x] What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
+*   **[x] Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
+*   **[x] Sample app**: added Export/Import buttons (Settings screen) and a `DuplicatePolicy` toggle (New Download sheet) to demonstrate portability and deduplication behavior.
 
 ### Phase 8 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-8-portability-dedup`.
-    *   [ ] Complete Sample app integration for export/import and duplicate detection.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success (`assembleDebug`, `lint`).
-    *   [ ] Update `README.md` comprehensively with portability and duplicate policy documentation.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create feature branch `feature/phase-8-portability-dedup`.
+    *   [x] Complete Sample app integration for export/import and duplicate detection.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success (`assembleDebug`, `lint`).
+    *   [x] Update `README.md` comprehensively with portability and duplicate policy documentation.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 
