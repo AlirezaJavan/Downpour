@@ -229,37 +229,39 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ---
 
-## Phase 13: Advanced Recovery & URL Refresh
-*Focus: Robustness against expired credentials and server-side changes.*
+## Phase 13: Advanced Recovery, URL Refresh & Segment Integrity
+*Focus: Robustness against expired credentials, server-side changes, and network corruption.*
 
 *   **[ ] URL Refresh Hook**: Add `OnUrlExpiredListener` or a `UrlProvider` to `DownloadRequest` that allows fetching a fresh URL (with new tokens) when a download fails with 401/403, resuming from the same offset.
 *   **[ ] Cookie Synchronization**: Ensure cookies from the initial metadata probe are correctly propagated to all parallel part-download requests.
+*   **[ ] Per-Segment Hash Validation (Chunk Integrity)**: Support optional block-level checksum maps (`ChunkChecksum`) so corrupted HTTP range segments are detected during transfer and retried individually without discarding already-downloaded valid parts.
 
 ### Phase 13 Workflow
 *   **[ ] Steps**:
     *   [ ] Create a new feature/enhancement branch `feature/phase-13-recovery-refresh`.
-    *   [ ] Implement refresh logic and cookie propagation.
+    *   [ ] Implement refresh logic, cookie propagation, and per-segment chunk validation.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with URL refresh examples and cookie management docs.
+    *   [ ] Update `README.md` comprehensively with URL refresh examples, chunk integrity, and cookie management docs.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
 
 ---
 
 ## Phase 14: System & Media Integration
-*Focus: Making downloaded content immediately accessible to the user and system.*
+*Focus: Making downloaded content immediately accessible to the user and supporting stream media.*
 
 *   **[ ] MediaStore Synchronization**: Add a flag to `DownloadRequest` to automatically scan completed files into the `MediaStore` (Images, Video, Audio, or Downloads) using `MediaScannerConnection`.
 *   **[ ] Intent Handling Helper**: Provide a standard way to register the app as a system-wide download handler for specific MIME types, easing integration for browser-like apps.
+*   **[ ] HLS / M3U8 Stream Downloading**: Support HTTP Live Streaming (`.m3u8`) playlists by parsing segment URLs, fetching video/audio segments in parallel with progress tracking, and stitching them into a unified `.mp4` file.
 
 ### Phase 14 Workflow
 *   **[ ] Steps**:
     *   [ ] Create a new feature/enhancement branch `feature/phase-14-system-integration`.
-    *   [ ] Implement MediaStore sync and intent helpers.
+    *   [ ] Implement MediaStore sync, intent helpers, and HLS stream segment downloading/stitching.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with MediaStore and Intent usage examples.
+    *   [ ] Update `README.md` comprehensively with MediaStore, HLS stream downloading, and Intent usage examples.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
 
@@ -280,3 +282,60 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Update `README.md` comprehensively with security and encryption examples.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
+
+---
+
+## Phase 16: Background Resilience & WorkManager OS Integration
+*Focus: Guarantee background execution under strict Android 14/15 OS restrictions and metered data budgets.*
+
+*   **[ ] WorkManager Fallback Engine**: Android 14 (API 34) and 15 strictly regulate Foreground Service background launches (`DATA_SYNC` / `SPECIAL_USE`). Implement an automated `WorkManagerEngine` fallback that executes background download queues via `Expedited Work` or `SystemJobService` when OS restrictions prohibit foreground service initialization.
+*   **[ ] Metered Data Quota Cap**: Add `maxMobileDataBytes(limit)` constraint to `DownloadRequest`, enabling downloads to consume up to a user-specified byte limit on metered cellular networks before automatically pausing to wait for unmetered Wi-Fi.
+
+### Phase 16 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-16-background-resilience`.
+    *   [ ] Implement WorkManager fallback engine and metered data quota manager.
+    *   [ ] Full test coverage (>90%) and all tests pass.
+    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Update `README.md` comprehensively with Android 14/15 WorkManager fallback and cellular quota docs.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 17: Request Dependencies, Multi-File Bundles & Selective Archive Fetching
+*Focus: Execution pipeline orchestration, multi-file packages, and smart zip extraction.*
+
+*   **[ ] Request Dependencies (`dependsOn`)**: Allow `DownloadRequest` to specify `dependsOn(parentDownloadId)` to form sequential download chains (e.g. download asset manifest first, then asset payload). Dependent requests remain in `WaitingForDependency` state until parent completes successfully.
+*   **[ ] Multi-File Download Bundles (`DownloadBundle`)**: Group related items (e.g., video + audio + cover + subtitles) into a single composite bundle with aggregate progress tracking and unified lifecycle controls (pause/resume/cancel package items together).
+*   **[ ] Selective Remote Archive Fetching**: Provide a `RemoteZipFetcher` tool that parses a remote ZIP file's Central Directory via HTTP Range requests, allowing selective extraction and downloading of individual files inside a zip without downloading the full archive.
+*   **[ ] Streaming ZIP Post-Processor**: Add a built-in `UnzipPostProcessor` with real-time extraction progress updates, password support, and disk space pre-checks.
+
+### Phase 17 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-17-dependencies-bundles-archives`.
+    *   [ ] Implement request dependency graph, multi-file download bundles, selective remote ZIP parser, and unzip post-processor.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with dependency chaining, multi-file bundles, and ZIP extraction examples.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 18: Telemetry, Analytics & Performance Observability
+*Focus: Enterprise-grade operational metrics, speed profiling, and network diagnostics.*
+
+*   **[ ] Download Analytics Listener**: Introduce `DownloadAnalyticsListener` to emit high-resolution performance metrics (Time-To-First-Byte [TTFB], DNS resolution duration, connection setup latency, segment retry counts, and average throughput per host).
+*   **[ ] Speed History & Diagnostics Timeline**: Implement `SpeedHistoryTracker` to record rolling throughput samples over time, enabling visual speed graphs in Jetpack Compose UI and seamless integration with telemetry backends (e.g. Datadog, Firebase, Sentry).
+
+### Phase 18 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-18-telemetry-analytics`.
+    *   [ ] Implement analytics event emitter and speed history timeline tracker.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with analytics and performance profiling docs.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
