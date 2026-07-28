@@ -94,9 +94,9 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### 8.1 Queue export/import
 
-*   **Where**: new `api/QueueSnapshot.kt` (Kotlinx Serialization data class), new methods on `DownloadManager` interface + `DefaultDownloadManager`: `exportQueue(): String` (JSON) and `importQueue(json: String, conflictStrategy: ConflictStrategy)`.
-*   **What**: Serialize pending/paused/failed `DownloadItem`s (not `Completed`/`Cancelled` by default, configurable) into a JSON snapshot: url, destination, headers, priority, tags, metadata, checksum, mirrors, constraints. Exclude live progress/state — imported items re-enter as `Queued` and re-probe the server (reuse the existing metadata-probing path), since byte offsets from another install/device are not trustworthy.
-*   **Tests**: round-trip test in `DownpourTest.kt` — export, wipe DB, import, assert requests reconstruct equivalently (excluding transient state).
+*   **[x] Where**: new `api/QueueSnapshot.kt` (Kotlinx Serialization data class), new methods on `DownloadManager` interface + `DefaultDownloadManager`: `exportQueue(): String` (JSON) and `importQueue(json: String, conflictStrategy: ConflictStrategy)`.
+*   **[x] What**: Serialize pending/paused/failed `DownloadItem`s (not `Completed`/`Cancelled` by default, configurable) into a JSON snapshot: url, destination, headers, priority, tags, metadata, checksum, mirrors, constraints. Exclude live progress/state — imported items re-enter as `Queued` and re-probe the server (reuse the existing metadata-probing path), since byte offsets from another install/device are not trustworthy.
+*   **[x] Tests**: round-trip test in `DownpourTest.kt` — export, wipe DB, import, assert requests reconstruct equivalently (excluding transient state).
 
 ### 8.2 Duplicate detection
 
@@ -104,6 +104,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
 *   **Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
 *   **[ ] Sample app**: add Export/Import buttons (Settings screen, Phase 11) that call `exportQueue()`/`importQueue(...)` against a file in app-private storage, and enqueue the same URL twice from the UI to demonstrate `DuplicatePolicy.REUSE_EXISTING` returning the same id.
+
+### Phase 8 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-8-portability-dedup`.
+    *   [ ] Complete Sample app integration for export/import and duplicate detection.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Update `README.md` comprehensively with portability and duplicate policy documentation.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
 
 ---
 
@@ -116,6 +126,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[ ] CI**: publish snapshot builds (`-SNAPSHOT` version) to a snapshot repo on every merge to `master`, separate from the tagged Maven Central release flow.
 *   **[ ] Sample app**: not needed — this phase is internal tooling/CI with no library-facing API surface to showcase.
 
+### Phase 9 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-9-quality-tooling`.
+    *   [ ] Implementation of Detekt, Instrumented tests, and CI enhancements.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Update `README.md` comprehensively with new quality standards and badges.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
 ---
 
 ## Phase 10: Advanced Diagnostics
@@ -126,6 +146,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **What**: A Compose screen listing retry history, last error, resume-support flag, and connection-level part progress (start/end/downloaded per `PartPlan`, surfaced through a new field on `DiagnosticReport` if not already exposed — check `api/DiagnosticReport.kt` first, extend rather than duplicate).
 *   **Tests**: `DiagnosticReportTest.kt` extended for any new fields; Compose screen gets a Paparazzi/Compose UI test if the project already has that infra (check before adding a new test framework).
 *   **[ ] Sample app**: this phase's `DiagnosticsScreen` *is* the sample-app deliverable — wire it into the Diagnostics destination added in Phase 5's sample step, replacing the plain `getDiagnosticReport` text dump.
+
+### Phase 10 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-10-advanced-diagnostics`.
+    *   [ ] Implementation of Compose Diagnostics Screen.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with Diagnostics UI documentation.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
 
 ---
 
@@ -148,3 +178,77 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   Compose `DownloadItemCard` — used in the Downloads screen instead of a hand-rolled row, so the drop-in component itself gets exercised.
     *   `Downpour.getFileUri(...)` — an "Open" action on completed items using the `FileProvider`.
 *   **Tests**: sample app is a demo, not a library surface — no new unit-test obligations — but each new screen should get a manual pass noted in the PR description (this repo's `verify` skill / manual smoke test) since Compose UI here isn't under CI.
+
+### Phase 11 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-11-sample-showcase`.
+    *   [ ] Full implementation of navigation and feature screens in the sample app.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with Sample app preview and features.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 12: Bandwidth Strategy & Thermal Safety
+*Focus: Optimize resource usage for device health and network fairness.*
+
+*   **[ ] Dynamic Bandwidth Allocation**: Implement a `BandwidthDistributor` that divides the global `maxBytesPerSecond` among active downloads based on their `Priority`.
+*   **[ ] Thermal Throttling**: Add a `ThermalMonitor` that listens to system thermal status and automatically reduces connection count or pauses downloads if the device enters `THERMAL_STATUS_MODERATE` or higher.
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-12-bandwidth-thermal`.
+    *   [ ] Implement bandwidth allocation logic and thermal listener.
+    *   [ ] Full test coverage (>90%) and all tests pass.
+    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Update `README.md` comprehensively with thermal and bandwidth configuration details.
+    *   [ ] Increase version in `gradle.properties` (e.g., `0.9.0`).
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 13: Advanced Recovery & URL Refresh
+*Focus: Robustness against expired credentials and server-side changes.*
+
+*   **[ ] URL Refresh Hook**: Add `OnUrlExpiredListener` or a `UrlProvider` to `DownloadRequest` that allows fetching a fresh URL (with new tokens) when a download fails with 401/403, resuming from the same offset.
+*   **[ ] Cookie Synchronization**: Ensure cookies from the initial metadata probe are correctly propagated to all parallel part-download requests.
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-13-recovery-refresh`.
+    *   [ ] Implement refresh logic and cookie propagation.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with URL refresh examples and cookie management docs.
+    *   [ ] Increase version in `gradle.properties` (e.g., `0.10.0`).
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 14: System & Media Integration
+*Focus: Making downloaded content immediately accessible to the user and system.*
+
+*   **[ ] MediaStore Synchronization**: Add a flag to `DownloadRequest` to automatically scan completed files into the `MediaStore` (Images, Video, Audio, or Downloads) using `MediaScannerConnection`.
+*   **[ ] Intent Handling Helper**: Provide a standard way to register the app as a system-wide download handler for specific MIME types, easing integration for browser-like apps.
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-14-system-integration`.
+    *   [ ] Implement MediaStore sync and intent helpers.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with MediaStore and Intent usage examples.
+    *   [ ] Increase version in `gradle.properties` (e.g., `0.11.0`).
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 15: Security & Privacy Extensions
+*Focus: Protecting downloaded data and verifying authenticity.*
+
+*   **[ ] PGP Signature Verification**: Extend `ContentValidation` to support PGP signatures for high-security environments, verified after completion.
+*   **[ ] Encrypted Destination**: Support downloading directly into an `EncryptedFile` (using AndroidX Security-Crypto) or a hidden, app-private directory with restricted access.
+*   **[ ] Steps**:
+    *   [ ] Create feature branch `feature/phase-15-security`.
+    *   [ ] Implement PGP verification and encrypted storage support.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with security and encryption examples.
+    *   [ ] Increase version in `gradle.properties` (e.g., `1.0.0`).
+    *   [ ] Commit with proper message.

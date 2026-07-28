@@ -66,7 +66,7 @@ Downpour requires several permissions to operate reliably in the background. Whi
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.alirezajavan:downpour:0.7.0")
+    implementation("io.github.alirezajavan:downpour:0.8.0")
 }
 ```
 
@@ -423,6 +423,21 @@ The engine serializes every state transition under a single lock, so user action
 
 - **Checksums** are verified once on completion by streaming the file through the digest in 64 KB chunks. A live streaming hash is intentionally avoided because it cannot be computed correctly for multi-connection (out-of-order) or resumed (mid-file) transfers without persisting intermediate digest state.
 - **Storage** uses the built-in scoped-storage/`Uri` backend. Random-access writes underpin resume and multi-connection correctness, so storage is not a consumer-pluggable extension point.
+
+---
+
+## Roadmap
+
+Downpour is actively evolving. Key future milestones include:
+
+- **Phase 9: Quality & Tooling** — Instrumented tests and advanced static analysis.
+- **Phase 10: Advanced Diagnostics** — Visualizing part-level progress and retry history in Compose.
+- **Phase 12: Bandwidth Strategy & Thermal Safety** — Priority-weighted bandwidth distribution and thermal-aware throttling.
+- **Phase 13: Advanced Recovery & URL Refresh** — Seamless resumption with fresh tokens/URLs after expiration.
+- **Phase 14: System & Media Integration** — Automatic MediaStore scanning and browser intent helpers.
+- **Phase 15: Security & Privacy Extensions** — PGP verification and encrypted storage support.
+
+See [MASTER_PLAN.md](MASTER_PLAN.md) for the full detailed roadmap.
 
 ## Contributing
 
