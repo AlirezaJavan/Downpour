@@ -64,6 +64,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Acceptance**: a download on a simulated variable-bandwidth `HttpDownloadDataSource` fake converges to a stable connection count within the reevaluation window and never exceeds `maxConnections` or drops below `minConnections`.
 *   **[x] Sample app**: added an `adaptiveConcurrency` toggle plus `minConnections`/re-evaluation-interval sliders to the Settings screen. Since `Downpour.getInstance` is a process-wide singleton that ignores later config changes, "Apply & restart" persists the settings and relaunches the process rather than pretending a live rebuild is possible. **Remaining**: no per-item live effective-connection-count readout (would need a new field on `DiagnosticReport`/`DownloadItem`, out of scope for a sample-app-only change).
 
+### Phase 6 Workflow
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-6-adaptive-performance`.
+    *   [x] Implementation of dynamic concurrency tuning and SpeedMeter reuse.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` with adaptive concurrency details.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
+
 ---
 
 ## Phase 7: Scheduling & Automation
@@ -86,6 +96,16 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 *   **[x] Tests**: `DownloadEngineStateTest.kt` — verify a download with `scheduleAt` stays `Scheduled` until the timestamp is reached.
 *   **[x] Sample app**: add a Date/Time picker for "Schedule start" in the New Download sheet.
 
+### Phase 7 Workflow
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-7-scheduling`.
+    *   [x] Implementation of time-window and date-based scheduling.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` with scheduling examples.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
+
 ---
 
 ## Phase 8: Data Portability & Dedup
@@ -100,20 +120,20 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### 8.2 Duplicate detection
 
-*   **Where**: `internal/DefaultDownloadManager.kt` (`enqueue`), `internal/data/DownloadRepository.kt` (add a lookup by URL+destination or checksum).
-*   **What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
-*   **Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
-*   **[ ] Sample app**: add Export/Import buttons (Settings screen, Phase 11) that call `exportQueue()`/`importQueue(...)` against a file in app-private storage, and enqueue the same URL twice from the UI to demonstrate `DuplicatePolicy.REUSE_EXISTING` returning the same id.
+*   **[x] Where**: `internal/DefaultDownloadManager.kt` (`enqueue`), `internal/data/DownloadRepository.kt` (add a lookup by URL+destination or checksum).
+*   **[x] What**: Before creating a new `DownloadEntity`, check for an existing non-terminal (`Queued`/`Running`/`Paused`/`WaitingForNetwork`) entity with the same URL *and* destination path. Default behavior: return the existing id instead of enqueuing a duplicate (configurable via a new `DuplicatePolicy` enum: `REUSE_EXISTING` (default) | `ALLOW_DUPLICATE`, set globally in `DownloadManagerConfig` or per-request).
+*   **[x] Tests**: `DefaultDownloadManagerTest.kt` — enqueue the same request twice, assert single entity id returned under `REUSE_EXISTING`; assert two ids under `ALLOW_DUPLICATE`.
+*   **[x] Sample app**: added Export/Import buttons (Settings screen) and a `DuplicatePolicy` toggle (New Download sheet) to demonstrate portability and deduplication behavior.
 
 ### Phase 8 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-8-portability-dedup`.
-    *   [ ] Complete Sample app integration for export/import and duplicate detection.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success (`assembleDebug`, `lint`).
-    *   [ ] Update `README.md` comprehensively with portability and duplicate policy documentation.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-8-portability-dedup`.
+    *   [x] Complete Sample app integration for export/import and duplicate detection.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success (`assembleDebug`, `lint`).
+    *   [x] Update `README.md` comprehensively with portability and duplicate policy documentation.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 
@@ -128,7 +148,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### Phase 9 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-9-quality-tooling`.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-9-quality-tooling`.
     *   [ ] Implementation of Detekt, Instrumented tests, and CI enhancements.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success (`assembleDebug`, `lint`).
@@ -149,7 +169,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### Phase 10 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-10-advanced-diagnostics`.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-10-advanced-diagnostics`.
     *   [ ] Implementation of Compose Diagnostics Screen.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
@@ -181,7 +201,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 ### Phase 11 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-11-sample-showcase`.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-11-sample-showcase`.
     *   [ ] Full implementation of navigation and feature screens in the sample app.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
@@ -196,45 +216,53 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 *   **[ ] Dynamic Bandwidth Allocation**: Implement a `BandwidthDistributor` that divides the global `maxBytesPerSecond` among active downloads based on their `Priority`.
 *   **[ ] Thermal Throttling**: Add a `ThermalMonitor` that listens to system thermal status and automatically reduces connection count or pauses downloads if the device enters `THERMAL_STATUS_MODERATE` or higher.
+
+### Phase 12 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-12-bandwidth-thermal`.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-12-bandwidth-thermal`.
     *   [ ] Implement bandwidth allocation logic and thermal listener.
     *   [ ] Full test coverage (>90%) and all tests pass.
     *   [ ] Build success (`assembleDebug`, `lint`).
     *   [ ] Update `README.md` comprehensively with thermal and bandwidth configuration details.
-    *   [ ] Increase version in `gradle.properties` (e.g., `0.9.0`).
+    *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
 
 ---
 
-## Phase 13: Advanced Recovery & URL Refresh
-*Focus: Robustness against expired credentials and server-side changes.*
+## Phase 13: Advanced Recovery, URL Refresh & Segment Integrity
+*Focus: Robustness against expired credentials, server-side changes, and network corruption.*
 
 *   **[ ] URL Refresh Hook**: Add `OnUrlExpiredListener` or a `UrlProvider` to `DownloadRequest` that allows fetching a fresh URL (with new tokens) when a download fails with 401/403, resuming from the same offset.
 *   **[ ] Cookie Synchronization**: Ensure cookies from the initial metadata probe are correctly propagated to all parallel part-download requests.
+*   **[ ] Per-Segment Hash Validation (Chunk Integrity)**: Support optional block-level checksum maps (`ChunkChecksum`) so corrupted HTTP range segments are detected during transfer and retried individually without discarding already-downloaded valid parts.
+
+### Phase 13 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-13-recovery-refresh`.
-    *   [ ] Implement refresh logic and cookie propagation.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-13-recovery-refresh`.
+    *   [ ] Implement refresh logic, cookie propagation, and per-segment chunk validation.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with URL refresh examples and cookie management docs.
-    *   [ ] Increase version in `gradle.properties` (e.g., `0.10.0`).
+    *   [ ] Update `README.md` comprehensively with URL refresh examples, chunk integrity, and cookie management docs.
+    *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
 
 ---
 
 ## Phase 14: System & Media Integration
-*Focus: Making downloaded content immediately accessible to the user and system.*
+*Focus: Making downloaded content immediately accessible to the user and supporting stream media.*
 
 *   **[ ] MediaStore Synchronization**: Add a flag to `DownloadRequest` to automatically scan completed files into the `MediaStore` (Images, Video, Audio, or Downloads) using `MediaScannerConnection`.
 *   **[ ] Intent Handling Helper**: Provide a standard way to register the app as a system-wide download handler for specific MIME types, easing integration for browser-like apps.
+*   **[ ] HLS / M3U8 Stream Downloading**: Support HTTP Live Streaming (`.m3u8`) playlists by parsing segment URLs, fetching video/audio segments in parallel with progress tracking, and stitching them into a unified `.mp4` file.
+
+### Phase 14 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-14-system-integration`.
-    *   [ ] Implement MediaStore sync and intent helpers.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-14-system-integration`.
+    *   [ ] Implement MediaStore sync, intent helpers, and HLS stream segment downloading/stitching.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with MediaStore and Intent usage examples.
-    *   [ ] Increase version in `gradle.properties` (e.g., `0.11.0`).
+    *   [ ] Update `README.md` comprehensively with MediaStore, HLS stream downloading, and Intent usage examples.
+    *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
 
 ---
@@ -244,11 +272,70 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 *   **[ ] PGP Signature Verification**: Extend `ContentValidation` to support PGP signatures for high-security environments, verified after completion.
 *   **[ ] Encrypted Destination**: Support downloading directly into an `EncryptedFile` (using AndroidX Security-Crypto) or a hidden, app-private directory with restricted access.
+
+### Phase 15 Workflow
 *   **[ ] Steps**:
-    *   [ ] Create feature branch `feature/phase-15-security`.
+    *   [ ] Create a new feature/enhancement branch `feature/phase-15-security`.
     *   [ ] Implement PGP verification and encrypted storage support.
     *   [ ] Full test coverage and all tests pass.
     *   [ ] Build success.
     *   [ ] Update `README.md` comprehensively with security and encryption examples.
-    *   [ ] Increase version in `gradle.properties` (e.g., `1.0.0`).
+    *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
+
+---
+
+## Phase 16: Background Resilience & WorkManager OS Integration
+*Focus: Guarantee background execution under strict Android 14/15 OS restrictions and metered data budgets.*
+
+*   **[ ] WorkManager Fallback Engine**: Android 14 (API 34) and 15 strictly regulate Foreground Service background launches (`DATA_SYNC` / `SPECIAL_USE`). Implement an automated `WorkManagerEngine` fallback that executes background download queues via `Expedited Work` or `SystemJobService` when OS restrictions prohibit foreground service initialization.
+*   **[ ] Metered Data Quota Cap**: Add `maxMobileDataBytes(limit)` constraint to `DownloadRequest`, enabling downloads to consume up to a user-specified byte limit on metered cellular networks before automatically pausing to wait for unmetered Wi-Fi.
+
+### Phase 16 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-16-background-resilience`.
+    *   [ ] Implement WorkManager fallback engine and metered data quota manager.
+    *   [ ] Full test coverage (>90%) and all tests pass.
+    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Update `README.md` comprehensively with Android 14/15 WorkManager fallback and cellular quota docs.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 17: Request Dependencies, Multi-File Bundles & Selective Archive Fetching
+*Focus: Execution pipeline orchestration, multi-file packages, and smart zip extraction.*
+
+*   **[ ] Request Dependencies (`dependsOn`)**: Allow `DownloadRequest` to specify `dependsOn(parentDownloadId)` to form sequential download chains (e.g. download asset manifest first, then asset payload). Dependent requests remain in `WaitingForDependency` state until parent completes successfully.
+*   **[ ] Multi-File Download Bundles (`DownloadBundle`)**: Group related items (e.g., video + audio + cover + subtitles) into a single composite bundle with aggregate progress tracking and unified lifecycle controls (pause/resume/cancel package items together).
+*   **[ ] Selective Remote Archive Fetching**: Provide a `RemoteZipFetcher` tool that parses a remote ZIP file's Central Directory via HTTP Range requests, allowing selective extraction and downloading of individual files inside a zip without downloading the full archive.
+*   **[ ] Streaming ZIP Post-Processor**: Add a built-in `UnzipPostProcessor` with real-time extraction progress updates, password support, and disk space pre-checks.
+
+### Phase 17 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-17-dependencies-bundles-archives`.
+    *   [ ] Implement request dependency graph, multi-file download bundles, selective remote ZIP parser, and unzip post-processor.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with dependency chaining, multi-file bundles, and ZIP extraction examples.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+
+---
+
+## Phase 18: Telemetry, Analytics & Performance Observability
+*Focus: Enterprise-grade operational metrics, speed profiling, and network diagnostics.*
+
+*   **[ ] Download Analytics Listener**: Introduce `DownloadAnalyticsListener` to emit high-resolution performance metrics (Time-To-First-Byte [TTFB], DNS resolution duration, connection setup latency, segment retry counts, and average throughput per host).
+*   **[ ] Speed History & Diagnostics Timeline**: Implement `SpeedHistoryTracker` to record rolling throughput samples over time, enabling visual speed graphs in Jetpack Compose UI and seamless integration with telemetry backends (e.g. Datadog, Firebase, Sentry).
+
+### Phase 18 Workflow
+*   **[ ] Steps**:
+    *   [ ] Create a new feature/enhancement branch `feature/phase-18-telemetry-analytics`.
+    *   [ ] Implement analytics event emitter and speed history timeline tracker.
+    *   [ ] Full test coverage and all tests pass.
+    *   [ ] Build success.
+    *   [ ] Update `README.md` comprehensively with analytics and performance profiling docs.
+    *   [ ] Increase version in `gradle.properties`.
+    *   [ ] Commit with proper message.
+

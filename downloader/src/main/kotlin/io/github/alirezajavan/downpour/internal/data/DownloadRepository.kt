@@ -162,6 +162,11 @@ internal class DownloadRepository(
         path: String,
     ): String? = dao.findNonTerminalByUrlAndPath(url, path, TERMINAL_STATUSES)
 
+    suspend fun findNonTerminalByChecksum(
+        algorithm: Int,
+        value: String,
+    ): String? = dao.findNonTerminalByChecksum(algorithm, value, TERMINAL_STATUSES)
+
     suspend fun replaceParts(parts: List<DownloadPartEntity>) {
         if (parts.isEmpty()) return
         dao.deleteParts(parts.first().downloadId)

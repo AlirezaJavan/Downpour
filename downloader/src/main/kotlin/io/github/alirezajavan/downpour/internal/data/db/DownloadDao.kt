@@ -208,6 +208,16 @@ internal interface DownloadDao {
         terminal: List<DownloadStatus>,
     ): String?
 
+    @Query(
+        "SELECT id FROM downloads WHERE checksumAlgorithm = :algorithm AND checksumValue = :value " +
+            "AND status NOT IN (:terminal) LIMIT 1",
+    )
+    suspend fun findNonTerminalByChecksum(
+        algorithm: Int,
+        value: String,
+        terminal: List<DownloadStatus>,
+    ): String?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertParts(parts: List<DownloadPartEntity>)
 

@@ -430,12 +430,16 @@ The engine serializes every state transition under a single lock, so user action
 
 Downpour is actively evolving. Key future milestones include:
 
-- **Phase 9: Quality & Tooling** — Instrumented tests and advanced static analysis.
-- **Phase 10: Advanced Diagnostics** — Visualizing part-level progress and retry history in Compose.
+- **Phase 9: Quality & Tooling** — Detekt static analysis, AndroidTest instrumented suite, and CI snapshot builds.
+- **Phase 10: Advanced Diagnostics** — Compose diagnostics screen with part-level progress grid and speed charts.
+- **Phase 11: Sample App Showcase** — Multi-tab sample app UI demonstrating every library feature.
 - **Phase 12: Bandwidth Strategy & Thermal Safety** — Priority-weighted bandwidth distribution and thermal-aware throttling.
-- **Phase 13: Advanced Recovery & URL Refresh** — Seamless resumption with fresh tokens/URLs after expiration.
-- **Phase 14: System & Media Integration** — Automatic MediaStore scanning and browser intent helpers.
-- **Phase 15: Security & Privacy Extensions** — PGP verification and encrypted storage support.
+- **Phase 13: Advanced Recovery, URL Refresh & Segment Integrity** — URL refresh hook on 401/403, cookie sync, and per-segment chunk checksum validation.
+- **Phase 14: System & Media Integration** — Automatic MediaStore scanning, intent helpers, and HLS (.m3u8) video stream downloading.
+- **Phase 15: Security & Privacy Extensions** — PGP signature verification and encrypted destination support.
+- **Phase 16: Background Resilience & WorkManager OS Integration** — Android 14/15 WorkManager fallback engine and metered cellular data quota limits.
+- **Phase 17: Request Dependencies, Multi-File Bundles & Archive Fetching** — Parent-child request dependency graphs (`dependsOn`), composite multi-file bundles (`DownloadBundle`), streaming zip extraction, and remote zip range fetching.
+- **Phase 18: Telemetry, Analytics & Performance Observability** — High-resolution network metrics (`DownloadAnalyticsListener`) and speed history tracking.
 
 See [MASTER_PLAN.md](MASTER_PLAN.md) for the full detailed roadmap.
 

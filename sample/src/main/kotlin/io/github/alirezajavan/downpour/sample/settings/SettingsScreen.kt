@@ -101,6 +101,34 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
 
             item {
+                SettingsSection(title = "Queue Portability") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(
+                            onClick = { viewModel.exportQueue(context) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Export Queue")
+                        }
+                        Button(
+                            onClick = { viewModel.importQueue(context) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Import Queue")
+                        }
+                    }
+                    Text(
+                        "Snapshots pending/paused/failed downloads to a JSON file in cache. " +
+                            "Importing them re-enqueues them with ConflictStrategy.FAIL.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item {
                 SettingsSection(title = "Logging") {
                     LabeledSwitch(
                         label = "Verbose logging",
