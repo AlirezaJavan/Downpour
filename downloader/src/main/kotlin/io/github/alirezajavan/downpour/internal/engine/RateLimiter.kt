@@ -6,7 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class RateLimiter(
-    private val bytesPerSecond: Long,
+    @Volatile private var bytesPerSecond: Long,
     private val nanoClock: () -> Long = System::nanoTime,
 ) {
     private val mutex = Mutex()
@@ -16,12 +16,20 @@ internal class RateLimiter(
     val isUnlimited: Boolean
         get() = bytesPerSecond <= 0
 
+    val currentLimit: Long
+        get() = bytesPerSecond
+
+    fun updateLimit(newBytesPerSecond: Long) {
+        bytesPerSecond = newBytesPerSecond
+    }
+
     suspend fun acquire(bytes: Int) {
         if (isUnlimited) return
         val waitMillis = mutex.withLock { reserve(bytes) }
         if (waitMillis > 0) delay(waitMillis.milliseconds)
     }
 
+    @Suppress("ReturnCount")
     private fun reserve(bytes: Int): Long {
         refill()
         // Deliberately left negative (not clamped to 0) when it goes into deficit: clamping would
@@ -32,17 +40,22 @@ internal class RateLimiter(
         // callers are reserving concurrently.
         availableTokens -= bytes
         if (availableTokens >= 0) return 0
-        return (-availableTokens / bytesPerSecond * MILLIS_PER_SECOND).toLong()
+        val currentCap = bytesPerSecond
+        if (currentCap <= 0) return 0
+        return (-availableTokens / currentCap * MILLIS_PER_SECOND).toLong()
     }
 
     private fun refill() {
         val now = nanoClock()
         val elapsedSeconds = (now - lastRefillNanos) / NANOS_PER_SECOND
-        availableTokens =
-            minOf(
-                bytesPerSecond.toDouble(),
-                availableTokens + elapsedSeconds * bytesPerSecond,
-            )
+        val currentCap = bytesPerSecond
+        if (currentCap > 0) {
+            availableTokens =
+                minOf(
+                    currentCap.toDouble(),
+                    availableTokens + elapsedSeconds * currentCap,
+                )
+        }
         lastRefillNanos = now
     }
 

@@ -5,11 +5,14 @@ import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.api.NetworkType
+import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
 import io.github.alirezajavan.downpour.internal.device.DeviceState
 import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
+import io.github.alirezajavan.downpour.internal.device.FakeThermalMonitor
+import io.github.alirezajavan.downpour.internal.device.ThermalMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.CoroutineScope
@@ -28,22 +31,52 @@ internal interface DownloadScheduler {
     fun schedule(delayMillis: Long)
 }
 
+@Suppress("LongParameterList", "LargeClass")
 internal class DownloadEngine(
     private val scope: CoroutineScope,
     private val repository: DownloadRepository,
-    private val taskFactory: () -> DownloadTaskRunner,
+    private val taskFactory: (DownloadEntity, RateLimiter?) -> DownloadTaskRunner,
     private val config: DownloadManagerConfig,
     private val serviceController: DownloadServiceController,
     private val networkMonitor: NetworkMonitor,
     private val deviceStateMonitor: DeviceStateMonitor,
+    private val thermalMonitor: ThermalMonitor = FakeThermalMonitor(),
     private val scheduler: DownloadScheduler,
     private val fileStore: FileStore,
     private val logger: Logger,
 ) {
+    @Suppress("LongParameterList")
+    constructor(
+        scope: CoroutineScope,
+        repository: DownloadRepository,
+        taskFactory: () -> DownloadTaskRunner,
+        config: DownloadManagerConfig,
+        serviceController: DownloadServiceController,
+        networkMonitor: NetworkMonitor,
+        deviceStateMonitor: DeviceStateMonitor,
+        scheduler: DownloadScheduler,
+        fileStore: FileStore,
+        logger: Logger,
+        thermalMonitor: ThermalMonitor = FakeThermalMonitor(),
+    ) : this(
+        scope = scope,
+        repository = repository,
+        taskFactory = { _, _ -> taskFactory() },
+        config = config,
+        serviceController = serviceController,
+        networkMonitor = networkMonitor,
+        deviceStateMonitor = deviceStateMonitor,
+        thermalMonitor = thermalMonitor,
+        scheduler = scheduler,
+        fileStore = fileStore,
+        logger = logger,
+    )
+
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val retryJobs = ConcurrentHashMap<String, Job>()
     private val tuningJobs = ConcurrentHashMap<String, Job>()
     private val tuners = ConcurrentHashMap<String, ConnectionTuner>()
+    private val taskRateLimiters = ConcurrentHashMap<String, RateLimiter>()
 
     // Downloads the server has 429'd for concurrency. Adaptive tuning is never (re)started for
     // these: a fresh ConnectionTuner always tries to *increase* connections on its first evaluation
@@ -90,6 +123,7 @@ internal class DownloadEngine(
         if (!networkWatchStarted.compareAndSet(false, true)) return
         scope.launch { networkMonitor.changes.drop(1).collect { schedule() } }
         scope.launch { deviceStateMonitor.changes.drop(1).collect { schedule() } }
+        scope.launch { thermalMonitor.thermalState.drop(1).collect { schedule() } }
     }
 
     fun onEnqueued() {
@@ -301,55 +335,100 @@ internal class DownloadEngine(
             DownloadDestination.Uri(destinationPath)
         }
 
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private suspend fun schedule() =
         scheduleMutex.withLock {
-            val status = networkMonitor.snapshot()
-            val device = deviceStateMonitor.snapshot()
-            logger.d("Scheduling downloads. Network status: $status, Device status: $device")
-
-            activeJobs.forEach { (id, _) ->
-                val entity = repository.getEntity(id) ?: return@forEach
-                val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
-                val deviceSatisfied = device.satisfiesConstraints(entity)
-
-                if (!networkSatisfied) {
-                    repository.setStatus(id, DownloadStatus.WAITING_FOR_NETWORK)
-                    cancelJob(id)
-                } else if (!deviceSatisfied) {
-                    val statusToSet =
-                        if (device.isTimeRestricted(entity)) {
-                            DownloadStatus.SCHEDULED
-                        } else {
-                            DownloadStatus.QUEUED
-                        }
-                    repository.setStatus(id, statusToSet)
-                    cancelJob(id)
-                }
-            }
-
-            repository.nextQueued(QUEUE_SCAN_LIMIT).forEach { entity ->
-                if (activeJobs.containsKey(entity.id)) return@forEach
-
-                val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
-                val deviceSatisfied = device.satisfiesConstraints(entity)
-
-                val targetStatus =
-                    when {
-                        !networkSatisfied -> DownloadStatus.WAITING_FOR_NETWORK
-                        !deviceSatisfied -> if (device.isTimeRestricted(entity)) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED
-                        else -> DownloadStatus.QUEUED
+            val thermalState = thermalMonitor.thermalState.value
+            if (thermalState.isCriticalOrHigher) {
+                val activeIds = activeJobs.keys.toList()
+                if (activeIds.isNotEmpty()) {
+                    logger.w("Critical thermal status ($thermalState): pausing active downloads")
+                    repository.setStatusIn(
+                        from = listOf(DownloadStatus.RUNNING),
+                        to = DownloadStatus.QUEUED,
+                        excludeIds = emptyList(),
+                    )
+                    activeIds.forEach {
+                        cancelJob(it)
+                        tuners.remove(it)
+                        taskRateLimiters.remove(it)
                     }
-
-                if (entity.status != targetStatus) {
-                    repository.setStatus(entity.id, targetStatus)
                 }
+            } else {
+                val status = networkMonitor.snapshot()
+                val device = deviceStateMonitor.snapshot()
+                logger.d("Scheduling downloads. Thermal: $thermalState, Network: $status, Device: $device")
+
+                activeJobs.forEach { (id, _) ->
+                    val entity = repository.getEntity(id) ?: return@forEach
+                    val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
+                    val deviceSatisfied = device.satisfiesConstraints(entity)
+
+                    if (!networkSatisfied) {
+                        repository.setStatus(id, DownloadStatus.WAITING_FOR_NETWORK)
+                        cancelJob(id)
+                        taskRateLimiters.remove(id)
+                    } else if (!deviceSatisfied) {
+                        val statusToSet =
+                            if (device.isTimeRestricted(entity)) {
+                                DownloadStatus.SCHEDULED
+                            } else {
+                                DownloadStatus.QUEUED
+                            }
+                        repository.setStatus(id, statusToSet)
+                        cancelJob(id)
+                        taskRateLimiters.remove(id)
+                    }
+                }
+
+                repository.nextQueued(QUEUE_SCAN_LIMIT).forEach { entity ->
+                    if (activeJobs.containsKey(entity.id)) return@forEach
+
+                    val networkSatisfied = status.satisfies(NetworkType.entries[entity.networkType])
+                    val deviceSatisfied = device.satisfiesConstraints(entity)
+
+                    val targetStatus =
+                        when {
+                            !networkSatisfied -> DownloadStatus.WAITING_FOR_NETWORK
+                            !deviceSatisfied -> if (device.isTimeRestricted(entity)) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED
+                            else -> DownloadStatus.QUEUED
+                        }
+
+                    if (entity.status != targetStatus) {
+                        repository.setStatus(entity.id, targetStatus)
+                    }
+                }
+
+                val maxConcurrent = if (thermalState.isThrottled) 1 else config.maxConcurrentDownloads
+                val freeSlots = maxConcurrent - activeJobs.size
+                if (freeSlots > 0) startEligible(freeSlots)
             }
 
-            val freeSlots = config.maxConcurrentDownloads - activeJobs.size
-            if (freeSlots > 0) startEligible(freeSlots)
+            recalculateBandwidthAllocations()
             scheduleNextWakeup()
             serviceController.onActiveCountChanged(activeJobs.size)
         }
+
+    private suspend fun recalculateBandwidthAllocations() {
+        val activeIds = activeJobs.keys.toList()
+        if (activeIds.isEmpty()) return
+
+        val activeEntities = activeIds.mapNotNull { id -> repository.getEntity(id) }
+        val bandwidthItems =
+            activeEntities.map { entity ->
+                BandwidthItem(
+                    id = entity.id,
+                    priority = Priority.entries.getOrElse(entity.priority) { Priority.NORMAL },
+                    individualMaxBytesPerSecond = entity.maxBytesPerSecond,
+                )
+            }
+
+        val allocations =
+            BandwidthDistributor.calculateAllocations(bandwidthItems, config.maxBytesPerSecond)
+        for ((id, allocatedRate) in allocations) {
+            taskRateLimiters[id]?.updateLimit(allocatedRate)
+        }
+    }
 
     private suspend fun scheduleNextWakeup() {
         val statuses = listOf(DownloadStatus.SCHEDULED, DownloadStatus.RUNNING)
@@ -435,15 +514,24 @@ internal class DownloadEngine(
      */
     private suspend fun start(entity: DownloadEntity) {
         logger.i("Starting download: ${entity.id} (${entity.url})")
-        val job = scope.launch(start = CoroutineStart.LAZY) { runTask(entity) }
+        val taskRateLimiter = RateLimiter(entity.maxBytesPerSecond)
+        taskRateLimiters[entity.id] = taskRateLimiter
+
+        val job = scope.launch(start = CoroutineStart.LAZY) { runTask(entity, taskRateLimiter) }
         activeJobs[entity.id] = job
         job.invokeOnCompletion {
+            taskRateLimiters.remove(entity.id)
             onJobFinished(entity.id, job)
             cancelTuning(entity.id)
+            scope.launch { scheduleMutex.withLock { recalculateBandwidthAllocations() } }
         }
         repository.setStatus(entity.id, DownloadStatus.RUNNING)
 
-        if (config.adaptiveConcurrency && entity.supportsResume && entity.id !in rateLimitedDownloads) {
+        val thermalState = thermalMonitor.thermalState.value
+        val shouldTune =
+            config.adaptiveConcurrency && entity.supportsResume &&
+                entity.id !in rateLimitedDownloads && !thermalState.isThrottled
+        if (shouldTune) {
             startAdaptiveTuning(entity.id, entity.maxConnections)
         }
 
@@ -454,6 +542,7 @@ internal class DownloadEngine(
         id: String,
         maxConnections: Int,
     ) {
+        if (thermalMonitor.thermalState.value.isThrottled) return
         cancelTuning(id)
         val tuner =
             tuners.getOrPut(id) {
@@ -465,6 +554,7 @@ internal class DownloadEngine(
                     delay(config.concurrencyReevaluationInterval)
                     val entity = repository.getEntity(id) ?: break
                     if (entity.status != DownloadStatus.RUNNING) break
+                    if (thermalMonitor.thermalState.value.isThrottled) break
 
                     val current =
                         if (entity.effectiveConnections > 0) {
@@ -512,8 +602,11 @@ internal class DownloadEngine(
         rateLimitedDownloads.remove(id)
     }
 
-    private suspend fun runTask(entity: DownloadEntity) {
-        when (val result = taskFactory().run(entity)) {
+    private suspend fun runTask(
+        entity: DownloadEntity,
+        taskRateLimiter: RateLimiter? = null,
+    ) {
+        when (val result = taskFactory(entity, taskRateLimiter).run(entity)) {
             is TaskResult.Completed -> onCompleted(entity, result)
             is TaskResult.Failed -> onFailed(entity, result.error)
         }

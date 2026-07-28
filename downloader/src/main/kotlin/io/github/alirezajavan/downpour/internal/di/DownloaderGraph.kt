@@ -9,7 +9,10 @@ import io.github.alirezajavan.downpour.internal.DefaultDownloadManager
 import io.github.alirezajavan.downpour.internal.DownloadEventDispatcher
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.db.DownloadDatabase
+import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.device.DefaultThermalMonitor
 import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
+import io.github.alirezajavan.downpour.internal.device.ThermalMonitor
 import io.github.alirezajavan.downpour.internal.engine.AndroidFileStore
 import io.github.alirezajavan.downpour.internal.engine.DownloadEngine
 import io.github.alirezajavan.downpour.internal.engine.DownloadPlanner
@@ -100,6 +103,8 @@ internal class DownloaderGraph private constructor(
 
     private val deviceStateMonitor = DeviceStateMonitor(appContext)
 
+    private val thermalMonitor: ThermalMonitor = DefaultThermalMonitor(appContext)
+
     private val scheduler =
         object : io.github.alirezajavan.downpour.internal.engine.DownloadScheduler {
             override fun schedule(delayMillis: Long) {
@@ -117,7 +122,7 @@ internal class DownloaderGraph private constructor(
     // serialized (prevents two same-URL downloads from claiming the same file).
     private val destinationMutex = Mutex()
 
-    private val taskFactory: () -> DownloadTaskRunner = {
+    private val taskFactory: (DownloadEntity, RateLimiter?) -> DownloadTaskRunner = { _, taskRateLimiter ->
         DownloadTask(
             dataSource = dataSource,
             planner = planner,
@@ -129,6 +134,7 @@ internal class DownloaderGraph private constructor(
             fileStore = fileStore,
             logger = logger,
             destinationMutex = destinationMutex,
+            taskRateLimiter = taskRateLimiter,
         )
     }
 
@@ -141,6 +147,7 @@ internal class DownloaderGraph private constructor(
             serviceController = serviceController,
             networkMonitor = networkMonitor,
             deviceStateMonitor = deviceStateMonitor,
+            thermalMonitor = thermalMonitor,
             scheduler = scheduler,
             fileStore = fileStore,
             logger = logger,
@@ -164,6 +171,7 @@ internal class DownloaderGraph private constructor(
         )
 
     init {
+        thermalMonitor.startMonitoring()
         scope.launch { engine.recover() }
     }
 
@@ -175,6 +183,7 @@ internal class DownloaderGraph private constructor(
      * next graph's `engine.recover()`.
      */
     private fun shutdown() {
+        thermalMonitor.stopMonitoring()
         scope.cancel()
         if (config.okHttpClient == null) {
             httpClient.dispatcher.executorService.shutdown()
