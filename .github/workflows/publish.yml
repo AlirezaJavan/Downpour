@@ -21,12 +21,18 @@ jobs:
         id: version
         run: echo "name=$(grep '^VERSION_NAME=' gradle.properties | cut -d'=' -f2)" >> "$GITHUB_OUTPUT"
 
-      - name: Check whether this version is already released
+      - name: Check snapshot vs release
         id: check
         run: |
-          if git rev-parse "v${{ steps.version.outputs.name }}" >/dev/null 2>&1; then
+          VERSION="${{ steps.version.outputs.name }}"
+          if [[ "$VERSION" == *"-SNAPSHOT"* ]]; then
+            echo "mode=snapshot" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "mode=release" >> "$GITHUB_OUTPUT"
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
+            echo "mode=release" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -52,7 +58,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
       - name: Create GitHub release
-        if: steps.check.outputs.should_release == 'true'
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.mode == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.name }}

@@ -141,20 +141,20 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 *Focus: Catch regressions the current unit-test suite can't reach.*
 
-*   **[ ] Detekt**: add `io.gitlab.arturbosch.detekt` alongside existing Spotless/ktlint in `build.gradle.kts`, with a baseline generated from current code so it doesn't block on pre-existing style. Wire into the same CI workflow as `android.yml`.
-*   **[ ] Instrumented tests**: add `downloader/src/androidTest` covering `DownloadService` foreground behavior and notification action `PendingIntent`s (Pause/Resume/Cancel actually reaching `DownloadManager`), which Robolectric can't fully exercise. Use `androidx.test.uiautomator` or `ServiceTestRule`.
-*   **[ ] CI**: publish snapshot builds (`-SNAPSHOT` version) to a snapshot repo on every merge to `master`, separate from the tagged Maven Central release flow.
-*   **[ ] Sample app**: not needed — this phase is internal tooling/CI with no library-facing API surface to showcase.
+*   **[x] Detekt**: add `io.gitlab.arturbosch.detekt` alongside existing Spotless/ktlint in `build.gradle.kts`, with a baseline generated from current code so it doesn't block on pre-existing style. Wire into the same CI workflow as `android.yml`.
+*   **[x] Instrumented tests**: add `downloader/src/androidTest` covering `DownloadService` foreground behavior and notification action `PendingIntent`s (Pause/Resume/Cancel actually reaching `DownloadManager`), which Robolectric can't fully exercise. Use `androidx.test.uiautomator` or `ServiceTestRule`.
+*   **[x] CI**: publish snapshot builds (`-SNAPSHOT` version) to a snapshot repo on every merge to `master`, separate from the tagged Maven Central release flow.
+*   **[x] Sample app**: not needed — this phase is internal tooling/CI with no library-facing API surface to showcase.
 
 ### Phase 9 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create a new feature/enhancement branch `feature/phase-9-quality-tooling`.
-    *   [ ] Implementation of Detekt, Instrumented tests, and CI enhancements.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success (`assembleDebug`, `lint`).
-    *   [ ] Update `README.md` comprehensively with new quality standards and badges.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-9-quality-tooling`.
+    *   [x] Implementation of Detekt, Instrumented tests, and CI enhancements.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success (`assembleDebug`, `lint`).
+    *   [x] Update `README.md` comprehensively with new quality standards and badges.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 

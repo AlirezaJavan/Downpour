@@ -40,7 +40,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 | Background work | Foreground `Service`, WorkManager recovery, AndroidX Startup |
 | Lifecycle | AndroidX Lifecycle Service |
 | UI (optional) | Jetpack Compose + Material 3 |
-| Build & quality | Gradle Version Catalogs, Spotless/ktlint, Dokka, JUnit 5 + Robolectric + MockK |
+| Build & quality | Gradle Version Catalogs, Spotless/ktlint, Detekt static analysis, Dokka, JUnit 5 + Robolectric + MockK + AndroidTest |
 
 ## Requirements
 
@@ -430,9 +430,8 @@ The engine serializes every state transition under a single lock, so user action
 
 Downpour is actively evolving. Key future milestones include:
 
-- **Phase 9: Quality & Tooling** — Detekt static analysis, AndroidTest instrumented suite, and CI snapshot builds.
-- **Phase 10: Advanced Diagnostics** — Compose diagnostics screen with part-level progress grid and speed charts.
-- **Phase 11: Sample App Showcase** — Multi-tab sample app UI demonstrating every library feature.
+- **Phase 9: Quality & Tooling** — Detekt static code analysis, instrumented tests, and snapshot CI release flow.
+- **Phase 10: Advanced Diagnostics** — Visualizing part-level progress and retry history in Compose.
 - **Phase 12: Bandwidth Strategy & Thermal Safety** — Priority-weighted bandwidth distribution and thermal-aware throttling.
 - **Phase 13: Advanced Recovery, URL Refresh & Segment Integrity** — URL refresh hook on 401/403, cookie sync, and per-segment chunk checksum validation.
 - **Phase 14: System & Media Integration** — Automatic MediaStore scanning, intent helpers, and HLS (.m3u8) video stream downloading.
@@ -448,7 +447,7 @@ See [MASTER_PLAN.md](MASTER_PLAN.md) for the full detailed roadmap.
 1. **Fork** and **clone** the repository.
 2. **Create a branch** for your feature or fix.
 3. **Style** — official Kotlin style (`kotlin.code.style=official`); `explicitApi()` is enforced. Format with `./gradlew spotlessApply`.
-4. **Test** — `./gradlew test`.
+4. **Static Analysis & Test** — `./gradlew spotlessCheck detekt :downloader:testDebugUnitTest :downloader:assembleRelease`.
 5. **Open a PR** with a clear description.
 
 ## License

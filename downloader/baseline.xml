@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:DownloadItemCard.kt$@OptIn(ExperimentalLayoutApi::class) @Composable public fun DownloadItemCard( item: DownloadItem, onPause: (String) -> Unit, onResume: (String) -> Unit, onCancel: (String) -> Unit, onRemove: (String) -> Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>CyclomaticComplexMethod:ErrorCodec.kt$ErrorCodec$fun decode( type: Int?, message: String?, httpCode: Int?, ): DownloadError</ID>
+    <ID>EmptyFunctionBlock:Logger.kt$NoOpLogger${}</ID>
+    <ID>FunctionNaming:DownloadItemCard.kt$@OptIn(ExperimentalLayoutApi::class) @Composable public fun DownloadItemCard( item: DownloadItem, onPause: (String) -> Unit, onResume: (String) -> Unit, onCancel: (String) -> Unit, onRemove: (String) -> Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:DefaultDownloadManager.kt$DefaultDownloadManager$( private val repository: DownloadRepository, private val engine: DownloadEngine, private val scope: CoroutineScope, private val config: DownloadManagerConfig, private val logger: Logger, private val eventDispatcher: DownloadEventDispatcher, private val clock: () -> Long = System::currentTimeMillis, private val idProvider: () -> String = { UUID.randomUUID().toString() }, )</ID>
+    <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, downloaded: Long, total: Long, speed: Long, eta: Long, now: Long, )</ID>
+    <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, downloaded: Long, total: Long, speed: Long, eta: Long, now: Long, running: DownloadStatus, )</ID>
+    <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, status: DownloadStatus, errorType: Int, errorMessage: String?, httpCode: Int?, retryCount: Int, now: Long, )</ID>
+    <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, supportsResume: Boolean, total: Long, etag: String?, lastModified: String?, now: Long, )</ID>
+    <ID>LongParameterList:DownloadEngine.kt$DownloadEngine$( private val scope: CoroutineScope, private val repository: DownloadRepository, private val taskFactory: () -> DownloadTaskRunner, private val config: DownloadManagerConfig, private val serviceController: DownloadServiceController, private val networkMonitor: NetworkMonitor, private val deviceStateMonitor: DeviceStateMonitor, private val scheduler: DownloadScheduler, private val fileStore: FileStore, private val logger: Logger, )</ID>
+    <ID>LongParameterList:DownloadItemCard.kt$( item: DownloadItem, onPause: (String) -> Unit, onResume: (String) -> Unit, onCancel: (String) -> Unit, onRemove: (String) -> Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:DownloadRequest.kt$DownloadRequest$( public val url: String, public val destination: DownloadDestination, public val headers: Map&lt;String, String>, public val priority: Priority, public val conflictStrategy: ConflictStrategy, public val networkType: NetworkType, public val maxConnections: Int, public val retryPolicy: RetryPolicy, public val maxBytesPerSecond: Long, public val checksum: Checksum?, public val tag: String?, public val workerClass: String?, public val metadata: Map&lt;String, String>, public val mirrors: List&lt;String>, public val requiresCharging: Boolean, public val requiresBatteryNotLow: Boolean, public val requiresStorageNotLow: Boolean, public val schedule: DownloadSchedule, public val duplicatePolicy: DuplicatePolicy?, )</ID>
+    <ID>LongParameterList:DownloadTask.kt$DownloadTask$( private val dataSource: HttpDownloadDataSource, private val planner: DownloadPlanner, private val partDownloader: PartDownloader, private val repository: DownloadRepository, private val config: DownloadManagerConfig, private val globalRateLimiter: RateLimiter, private val ioDispatcher: CoroutineDispatcher, private val fileStore: FileStore, private val logger: Logger, // Shared across all task instances: serializes destination resolution so two concurrent // downloads (e.g. the same URL enqueued twice) deterministically claim distinct filenames. private val destinationMutex: Mutex, private val clock: () -> Long = System::currentTimeMillis, )</ID>
+    <ID>LoopWithTooManyJumpStatements:DownloadEngine.kt$DownloadEngine$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DownloadPlanner.kt$DownloadPlanner$while</ID>
+    <ID>MaxLineLength:Converters.kt$Converters$fun</ID>
+    <ID>MaxLineLength:DefaultDownloadManager.kt$DefaultDownloadManager$override suspend fun getDiagnosticReport(id: String): DiagnosticReport?</ID>
+    <ID>MaxLineLength:DefaultDownloadManagerTest.kt$DefaultDownloadManagerTest$io.mockk.coEvery { repository.findNonTerminalByChecksum(ChecksumAlgorithm.SHA256.ordinal, "hash") } returns "existing_id"</ID>
+    <ID>MaxLineLength:DefaultDownloadManagerTest.kt$DefaultDownloadManagerTest$io.mockk.coEvery { repository.findNonTerminalByUrlAndPath("https://example.com", "path") } returns "existing_id"</ID>
+    <ID>MaxLineLength:DownloadEngine.kt$DownloadEngine$!deviceSatisfied -> if (device.isTimeRestricted(entity)) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED</ID>
+    <ID>MaxLineLength:DownloadEngine.kt$DownloadEngine$"(Retry-After=${error.retryAfterSeconds}s). Will retry per backoff policy without further downgrade."</ID>
+    <ID>MaxLineLength:DownloadEngineTest.kt$DownloadEngineTest$every { networkMonitor.snapshot() } returns NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)</ID>
+    <ID>MaxLineLength:DownloadMappersTest.kt$DownloadMappersTest$val a = downloadRequest("https://example.com/a", "/a").toEntity("a", 1L).copy(downloadedBytes = 30, totalBytes = 100)</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$"${ByteFormatter.formatSize(progress.downloadedBytes)} / ${ByteFormatter.formatSize(progress.totalBytes)}"</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_media_pause, "Pause all", action(DownloadService.ACTION_PAUSE_ALL))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_media_pause, "Pause", action(DownloadService.ACTION_PAUSE, item.id))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_media_play, "Resume all", action(DownloadService.ACTION_RESUME_ALL))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_media_play, "Resume", action(DownloadService.ACTION_RESUME, item.id))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel all", action(DownloadService.ACTION_CANCEL_ALL))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", action(DownloadService.ACTION_CANCEL, item.id))</ID>
+    <ID>MaxLineLength:DownloadNotificationFactory.kt$DownloadNotificationFactory$private fun notificationManager(): NotificationManager</ID>
+    <ID>MaxLineLength:DownloadRepository.kt$DownloadRepository$fun observeItemsByTag(tag: String): Flow&lt;List&lt;DownloadItem>></ID>
+    <ID>MaxLineLength:DownloadRepository.kt$DownloadRepository$suspend fun deleteExpiredCompleted(ttlMillis: Long)</ID>
+    <ID>MaxLineLength:DownloadRepository.kt$DownloadRepository$suspend fun entitiesByStatuses(statuses: List&lt;DownloadStatus>): List&lt;DownloadEntity></ID>
+    <ID>MaxLineLength:DownloadRepository.kt$DownloadRepository$suspend fun runningEntities(): List&lt;DownloadEntity></ID>
+    <ID>MaxLineLength:DownloadRepositoryTest.kt$DownloadRepositoryTest$repository.insert(createMockEntity("a").copy(destinationPath = "/d/file.bin", status = DownloadStatus.RUNNING))</ID>
+    <ID>MaxLineLength:FakeDownloadDao.kt$FakeDownloadDao$)</ID>
+    <ID>MaxLineLength:FakeDownloadDao.kt$FakeDownloadDao$it.copy(downloadedBytes = downloaded, totalBytes = total, bytesPerSecond = speed, etaMillis = eta, updatedAtMillis = now)</ID>
+    <ID>MaxLineLength:FakeDownloadDao.kt$FakeDownloadDao$override fun observeById(id: String): Flow&lt;DownloadEntity?></ID>
+    <ID>MaxLineLength:FakeDownloadDao.kt$FakeDownloadDao$private fun sortedByCreatedDesc(list: List&lt;DownloadEntity>): List&lt;DownloadEntity></ID>
+    <ID>MaxLineLength:FakeDownloadDao.kt$FakeDownloadDao$row.copy(downloadedBytes = downloaded, totalBytes = total, bytesPerSecond = speed, etaMillis = eta, updatedAtMillis = now)</ID>
+    <ID>MaxLineLength:HttpDownloadDataSource.kt$HttpDownloadDataSource.Companion$"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"</ID>
+    <ID>MaxLineLength:PartDownloader.kt$PartDownloader$logger.d("Starting part ${context.part.partId} for ${context.url} (Resolved Range: ${resolved.rangeStart}-${resolved.rangeEnd})")</ID>
+    <ID>ReturnCount:DefaultFilenameResolver.kt$DefaultFilenameResolver$override fun resolve(metadata: RemoteFileMetadata): String</ID>
+    <ID>ReturnCount:DefaultFilenameResolver.kt$DefaultFilenameResolver$private fun parseDisposition(disposition: String): String?</ID>
+    <ID>ReturnCount:DeviceStateMonitor.kt$DeviceState$fun satisfies( requiresCharging: Boolean, requiresBatteryNotLow: Boolean, requiresStorageNotLow: Boolean, schedule: DownloadSchedule, ): Boolean</ID>
+    <ID>ReturnCount:DownloadEngine.kt$DownloadEngine$private fun DeviceState.isTimeRestricted(entity: DownloadEntity): Boolean</ID>
+    <ID>ReturnCount:DownloadEngine.kt$DownloadEngine$private fun calculateTargetTime( schedule: DownloadSchedule, now: Long, ): Long</ID>
+    <ID>ReturnCount:DownloadEngine.kt$DownloadEngine$private suspend fun downgradeConnectionsIfRateLimited( entity: DownloadEntity, error: DownloadError, ): DownloadError</ID>
+    <ID>ReturnCount:DownloadNotificationFactory.kt$DownloadNotificationFactory$private fun text( items: List&lt;DownloadItem>, withProgress: List&lt;Pair&lt;DownloadItem, DownloadProgress>>, ): String</ID>
+    <ID>ReturnCount:DownloadNotificationFactory.kt$DownloadNotificationFactory$private fun title(items: List&lt;DownloadItem>): String</ID>
+    <ID>ReturnCount:DownloadPlanner.kt$DownloadPlanner$private suspend fun resumePlanOrNull( entity: DownloadEntity, info: RemoteFileInfo, ifRange: String?, ): DownloadPlan?</ID>
+    <ID>ReturnCount:DownloadPlanner.kt$DownloadPlanner$suspend fun plan( entity: DownloadEntity, info: RemoteFileInfo, fileLength: Long, activeConnections: Int = -1, ): DownloadPlan</ID>
+    <ID>ReturnCount:DownloadTask.kt$DownloadTask$private suspend fun resolveFinalDestination( entity: DownloadEntity, destination: DownloadDestination, info: RemoteFileInfo, ): DownloadDestination</ID>
+    <ID>ReturnCount:PartDownloader.kt$PartDownloader$private fun adjustForServerResponse( response: Response, resolved: ResolvedRange, context: PartContext, ): ResolvedRange</ID>
+    <ID>ReturnCount:SpeedMeter.kt$SpeedMeter$private fun computeSpeed(): Long</ID>
+    <ID>ThrowsCount:PartDownloader.kt$PartDownloader$private fun adjustForServerResponse( response: Response, resolved: ResolvedRange, context: PartContext, ): ResolvedRange</ID>
+    <ID>TooGenericExceptionCaught:DownloadTask.kt$DownloadTask$unexpected: Throwable</ID>
+    <ID>TooGenericExceptionCaught:HttpDownloadDataSource.kt$HttpDownloadDataSource$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PartDownloader.kt$PartDownloader$t: Throwable</ID>
+    <ID>TooManyFunctions:DefaultDownloadManager.kt$DefaultDownloadManager : DownloadManager</ID>
+    <ID>TooManyFunctions:DownloadDao.kt$DownloadDao</ID>
+    <ID>TooManyFunctions:DownloadEngine.kt$DownloadEngine</ID>
+    <ID>TooManyFunctions:DownloadManager.kt$DownloadManager</ID>
+    <ID>TooManyFunctions:DownloadNotificationFactory.kt$DownloadNotificationFactory</ID>
+    <ID>TooManyFunctions:DownloadPlanner.kt$DownloadPlanner</ID>
+    <ID>TooManyFunctions:DownloadRepository.kt$DownloadRepository</ID>
+    <ID>TooManyFunctions:DownloadRequest.kt$DownloadRequest$Builder</ID>
+    <ID>TooManyFunctions:DownloadTask.kt$DownloadTask : DownloadTaskRunner</ID>
+    <ID>UseCheckOrError:FileStore.kt$AndroidFileStore$throw IllegalStateException("Could not open stream for ${destination.uriString}")</ID>
+    <ID>UseCheckOrError:FileStore.kt$AndroidFileStore.UriSink$throw IllegalStateException("Could not open PFD for $uri")</ID>
+  </CurrentIssues>
+</SmellBaseline>
