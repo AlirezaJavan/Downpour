@@ -162,20 +162,20 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 
 *Focus: Surface what `getDiagnosticReport` already collects.*
 
-*   **Where**: new `compose/DiagnosticsScreen.kt` alongside the existing `compose/DownloadItemCard.kt`.
-*   **What**: A Compose screen listing retry history, last error, resume-support flag, and connection-level part progress (start/end/downloaded per `PartPlan`, surfaced through a new field on `DiagnosticReport` if not already exposed — check `api/DiagnosticReport.kt` first, extend rather than duplicate).
-*   **Tests**: `DiagnosticReportTest.kt` extended for any new fields; Compose screen gets a Paparazzi/Compose UI test if the project already has that infra (check before adding a new test framework).
-*   **[ ] Sample app**: this phase's `DiagnosticsScreen` *is* the sample-app deliverable — wire it into the Diagnostics destination added in Phase 5's sample step, replacing the plain `getDiagnosticReport` text dump.
+*   **[x] Where**: new `compose/DiagnosticsScreen.kt` alongside the existing `compose/DownloadItemCard.kt`.
+*   **[x] What**: A Compose screen listing retry history, last error, resume-support flag, and connection-level part progress (start/end/downloaded per `PartPlan`, surfaced through a new field on `DiagnosticReport` if not already exposed — check `api/DiagnosticReport.kt` first, extend rather than duplicate).
+*   **[x] Tests**: `DiagnosticReportTest.kt` extended for any new fields; Compose screen gets a Paparazzi/Compose UI test if the project already has that infra (check before adding a new test framework).
+*   **[x] Sample app**: this phase's `DiagnosticsScreen` *is* the sample-app deliverable — wire it into the Diagnostics destination added in Phase 5's sample step, replacing the plain `getDiagnosticReport` text dump.
 
 ### Phase 10 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create a new feature/enhancement branch `feature/phase-10-advanced-diagnostics`.
-    *   [ ] Implementation of Compose Diagnostics Screen.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with Diagnostics UI documentation.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-10-advanced-diagnostics`.
+    *   [x] Implementation of Compose Diagnostics Screen.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` comprehensively with Diagnostics UI documentation.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 

@@ -8,8 +8,10 @@ import io.github.alirezajavan.downpour.api.DownloadProgress
 import io.github.alirezajavan.downpour.api.DownloadRequest
 import io.github.alirezajavan.downpour.api.DownloadState
 import io.github.alirezajavan.downpour.api.GroupProgress
+import io.github.alirezajavan.downpour.api.PartProgress
 import io.github.alirezajavan.downpour.api.Priority
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.data.db.DownloadPartEntity
 
 internal fun DownloadRequest.toEntity(
     id: String,
@@ -147,7 +149,7 @@ internal fun List<DownloadEntity>.toGroupProgress(): GroupProgress =
         totalBytes = sumOf { it.totalBytes.coerceAtLeast(0) },
     )
 
-internal fun DownloadEntity.toDiagnosticReport(): DiagnosticReport =
+internal fun DownloadEntity.toDiagnosticReport(parts: List<DownloadPartEntity> = emptyList()): DiagnosticReport =
     DiagnosticReport(
         id = id,
         url = url,
@@ -166,4 +168,5 @@ internal fun DownloadEntity.toDiagnosticReport(): DiagnosticReport =
         lastModified = lastModified,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
+        parts = parts.map { PartProgress(it.index, it.startByte, it.endByte, it.currentOffset) },
     )

@@ -20,14 +20,13 @@
     <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun SettingsSection( title: String, content: @Composable () -> Unit, )</ID>
     <ID>FunctionNaming:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen(viewModel: SettingsViewModel = viewModel())</ID>
     <ID>FunctionNaming:Theme.kt$@Composable fun DownpourSampleTheme( darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit, )</ID>
-    <ID>LongMethod:DiagnosticsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DiagnosticsScreen(viewModel: DiagnosticsViewModel = viewModel())</ID>
     <ID>LongMethod:NewDownloadSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NewDownloadSheet( onDismiss: () -> Unit, onStart: (NewDownloadForm) -> Unit, )</ID>
     <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen(viewModel: SettingsViewModel = viewModel())</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt$Column</ID>
     <ID>MaxLineLength:DownloadsScreen.kt$if</ID>
     <ID>MaxLineLength:MainActivity.kt$text = "Downpour needs Notification and Exact Alarm permissions to manage downloads reliably in the background."</ID>
     <ID>MaxLineLength:NewDownloadSheet.kt$Preset("Broken + mirror") { it.copy(url = SampleCatalog.BROKEN_PRIMARY_URL, mirrorUrl = SampleCatalog.WORKING_MIRROR_URL) }</ID>
     <ID>ReturnCount:DownloadItemExt.kt$fun formatBytes(bytes: Long): String</ID>
     <ID>TooGenericExceptionCaught:SettingsViewModel.kt$SettingsViewModel$e: Exception</ID>
+    <ID>UnusedPrivateMember:DiagnosticsScreen.kt$@Composable private fun DiagnosticRow( label: String, value: String, )</ID>
   </CurrentIssues>
 </SmellBaseline>

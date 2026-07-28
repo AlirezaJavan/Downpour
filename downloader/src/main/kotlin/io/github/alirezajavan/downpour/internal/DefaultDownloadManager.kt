@@ -123,7 +123,11 @@ internal class DefaultDownloadManager(
 
     override suspend fun get(id: String): DownloadItem? = repository.getItem(id)
 
-    override suspend fun getDiagnosticReport(id: String): DiagnosticReport? = repository.getEntity(id)?.toDiagnosticReport()
+    override suspend fun getDiagnosticReport(id: String): DiagnosticReport? {
+        val entity = repository.getEntity(id) ?: return null
+        val parts = repository.getParts(id)
+        return entity.toDiagnosticReport(parts)
+    }
 
     override suspend fun getAll(): List<DownloadItem> = repository.getAllItems()
 

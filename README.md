@@ -26,7 +26,7 @@ Beyond the defaults, Downpour is designed to be **extended**: you can plug in yo
 - **Scheduling** — run downloads at specific times or within absolute time windows.
 - **Coroutine-first** — `suspend` operations and `Flow` observation throughout; no callbacks unless you want them.
 - **Customizable** — pluggable strategies and hooks for filenames, logging, post-processing, auth, and notifications.
-- **Drop-in UI** — an optional Jetpack Compose card component for download status and controls.
+- **Drop-in UI** — optional Jetpack Compose components (`DownloadItemCard` and `DiagnosticsScreen`) for download status, controls, and connection-level diagnostics.
 
 ## Built With
 

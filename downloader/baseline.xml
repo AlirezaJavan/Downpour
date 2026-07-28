@@ -5,7 +5,11 @@
     <ID>CyclomaticComplexMethod:DownloadItemCard.kt$@OptIn(ExperimentalLayoutApi::class) @Composable public fun DownloadItemCard( item: DownloadItem, onPause: (String) -> Unit, onResume: (String) -> Unit, onCancel: (String) -> Unit, onRemove: (String) -> Unit, modifier: Modifier = Modifier, )</ID>
     <ID>CyclomaticComplexMethod:ErrorCodec.kt$ErrorCodec$fun decode( type: Int?, message: String?, httpCode: Int?, ): DownloadError</ID>
     <ID>EmptyFunctionBlock:Logger.kt$NoOpLogger${}</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt$@Composable private fun DiagnosticDetailRow( label: String, value: String, )</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt$@Composable private fun PartProgressItem(part: PartProgress)</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt$@Composable public fun DiagnosticsScreen( report: DiagnosticReport?, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:DownloadItemCard.kt$@OptIn(ExperimentalLayoutApi::class) @Composable public fun DownloadItemCard( item: DownloadItem, onPause: (String) -> Unit, onResume: (String) -> Unit, onCancel: (String) -> Unit, onRemove: (String) -> Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:DiagnosticsScreen.kt$@Composable public fun DiagnosticsScreen( report: DiagnosticReport?, modifier: Modifier = Modifier, )</ID>
     <ID>LongParameterList:DefaultDownloadManager.kt$DefaultDownloadManager$( private val repository: DownloadRepository, private val engine: DownloadEngine, private val scope: CoroutineScope, private val config: DownloadManagerConfig, private val logger: Logger, private val eventDispatcher: DownloadEventDispatcher, private val clock: () -> Long = System::currentTimeMillis, private val idProvider: () -> String = { UUID.randomUUID().toString() }, )</ID>
     <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, downloaded: Long, total: Long, speed: Long, eta: Long, now: Long, )</ID>
     <ID>LongParameterList:DownloadDao.kt$DownloadDao$( id: String, downloaded: Long, total: Long, speed: Long, eta: Long, now: Long, running: DownloadStatus, )</ID>
@@ -18,7 +22,6 @@
     <ID>LoopWithTooManyJumpStatements:DownloadEngine.kt$DownloadEngine$while</ID>
     <ID>LoopWithTooManyJumpStatements:DownloadPlanner.kt$DownloadPlanner$while</ID>
     <ID>MaxLineLength:Converters.kt$Converters$fun</ID>
-    <ID>MaxLineLength:DefaultDownloadManager.kt$DefaultDownloadManager$override suspend fun getDiagnosticReport(id: String): DiagnosticReport?</ID>
     <ID>MaxLineLength:DefaultDownloadManagerTest.kt$DefaultDownloadManagerTest$io.mockk.coEvery { repository.findNonTerminalByChecksum(ChecksumAlgorithm.SHA256.ordinal, "hash") } returns "existing_id"</ID>
     <ID>MaxLineLength:DefaultDownloadManagerTest.kt$DefaultDownloadManagerTest$io.mockk.coEvery { repository.findNonTerminalByUrlAndPath("https://example.com", "path") } returns "existing_id"</ID>
     <ID>MaxLineLength:DownloadEngine.kt$DownloadEngine$!deviceSatisfied -> if (device.isTimeRestricted(entity)) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED</ID>
