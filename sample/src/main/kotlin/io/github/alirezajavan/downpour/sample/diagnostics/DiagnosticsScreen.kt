@@ -72,30 +72,10 @@ fun DiagnosticsScreen(viewModel: DiagnosticsViewModel = viewModel()) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                DiagnosticRow("State", current.state::class.simpleName.orEmpty())
-                                DiagnosticRow("Resume supported", current.isResumeSupported.toString())
-                                DiagnosticRow("Retry count", current.retryCount.toString())
-                                DiagnosticRow(
-                                    "Downloaded",
-                                    "${formatBytes(current.downloadedBytes)} / ${formatBytes(current.totalBytes)}",
-                                )
-                                DiagnosticRow("ETag", current.etag ?: "—")
-                                DiagnosticRow("Last-Modified", current.lastModified ?: "—")
-                                current.lastError?.let { error ->
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                                    DiagnosticRow("Last error", error.message ?: error::class.simpleName.orEmpty())
-                                }
-                            }
-                        }
-                    }
-                }
+                io.github.alirezajavan.downpour.compose.DiagnosticsScreen(
+                    report = current,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

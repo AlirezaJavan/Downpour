@@ -1,0 +1,9 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+style:
+  MagicNumber:
+    active: false
+  UnusedPrivateMember:
+    active: true

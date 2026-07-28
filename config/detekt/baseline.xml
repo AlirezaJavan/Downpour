@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>FunctionNaming:DiagnosticsScreen.kt$@Composable private fun DiagnosticRow( label: String, value: String, )</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DiagnosticsScreen(viewModel: DiagnosticsViewModel = viewModel())</ID>
+    <ID>FunctionNaming:DownloadsScreen.kt$@Composable private fun EmptyState(padding: PaddingValues)</ID>
+    <ID>FunctionNaming:DownloadsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DownloadsScreen(viewModel: DownloadsViewModel = viewModel())</ID>
+    <ID>FunctionNaming:GroupsScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun BulkActionsRow(viewModel: GroupsViewModel)</ID>
+    <ID>FunctionNaming:GroupsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun GroupsScreen(viewModel: GroupsViewModel = viewModel())</ID>
+    <ID>FunctionNaming:MainActivity.kt$@Composable private fun PermissionGate( onGrantNotifications: () -> Unit, onGrantAlarms: () -> Unit, )</ID>
+    <ID>FunctionNaming:MainActivity.kt$@Composable private fun SampleApp()</ID>
+    <ID>FunctionNaming:MainActivity.kt$@Composable private fun SampleBottomBar(navController: NavHostController)</ID>
+    <ID>FunctionNaming:NewDownloadSheet.kt$@Composable private fun DatePickerInput( label: String, selectedTimestamp: Long?, onTimestampChange: (Long?) -> Unit, )</ID>
+    <ID>FunctionNaming:NewDownloadSheet.kt$@Composable private fun LabeledSwitch( label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, )</ID>
+    <ID>FunctionNaming:NewDownloadSheet.kt$@Composable private fun Section( title: String, content: @Composable () -> Unit, )</ID>
+    <ID>FunctionNaming:NewDownloadSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NewDownloadSheet( onDismiss: () -> Unit, onStart: (NewDownloadForm) -> Unit, )</ID>
+    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun LabeledSlider( label: String, value: Float, range: ClosedFloatingPointRange&lt;Float>, steps: Int, onChange: (Float) -> Unit, )</ID>
+    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun LabeledSwitch( label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, )</ID>
+    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun SettingsSection( title: String, content: @Composable () -> Unit, )</ID>
+    <ID>FunctionNaming:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen(viewModel: SettingsViewModel = viewModel())</ID>
+    <ID>FunctionNaming:Theme.kt$@Composable fun DownpourSampleTheme( darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit, )</ID>
+    <ID>LongMethod:DiagnosticsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DiagnosticsScreen(viewModel: DiagnosticsViewModel = viewModel())</ID>
+    <ID>LongMethod:NewDownloadSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NewDownloadSheet( onDismiss: () -> Unit, onStart: (NewDownloadForm) -> Unit, )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen(viewModel: SettingsViewModel = viewModel())</ID>
+    <ID>MaxLineLength:DiagnosticsScreen.kt$Column</ID>
+    <ID>MaxLineLength:DownloadsScreen.kt$if</ID>
+    <ID>MaxLineLength:MainActivity.kt$text = "Downpour needs Notification and Exact Alarm permissions to manage downloads reliably in the background."</ID>
+    <ID>MaxLineLength:NewDownloadSheet.kt$Preset("Broken + mirror") { it.copy(url = SampleCatalog.BROKEN_PRIMARY_URL, mirrorUrl = SampleCatalog.WORKING_MIRROR_URL) }</ID>
+    <ID>ReturnCount:DownloadItemExt.kt$fun formatBytes(bytes: Long): String</ID>
+    <ID>TooGenericExceptionCaught:SettingsViewModel.kt$SettingsViewModel$e: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

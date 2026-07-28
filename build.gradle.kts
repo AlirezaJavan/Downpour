@@ -8,6 +8,24 @@ plugins {
     alias(libs.plugins.maven.publish) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.spotless)
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    baseline = file("$projectDir/baseline.xml")
+}
+
+subprojects {
+    apply(plugin = "io.gitlab.arturbosch.detekt")
+    detekt {
+        buildUponDefaultConfig = true
+        allRules = false
+        config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+        baseline = file("$projectDir/baseline.xml")
+    }
 }
 
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
