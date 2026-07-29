@@ -46,6 +46,11 @@ internal class DownloadRepository(
         status: DownloadStatus,
     ) = dao.updateStatus(id, status, clock())
 
+    suspend fun updateUrl(
+        id: String,
+        url: String,
+    ) = dao.updateUrl(id, url, clock())
+
     suspend fun setDestinationPath(
         id: String,
         path: String,

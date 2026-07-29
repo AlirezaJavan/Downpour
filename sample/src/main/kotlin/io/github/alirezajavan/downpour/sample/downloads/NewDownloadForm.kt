@@ -24,6 +24,8 @@ data class NewDownloadForm(
     val checksumHex: String = "",
     val mirrorUrl: String = "",
     val schedule: DownloadSchedule = DownloadSchedule(),
+    val useUrlProvider: Boolean = false,
+    val useChunkChecksum: Boolean = false,
 ) {
     fun fileName(): String = url.substringAfterLast('/').ifBlank { "download_${System.currentTimeMillis()}" }
 }

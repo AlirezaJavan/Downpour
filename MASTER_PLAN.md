@@ -232,19 +232,19 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
 ## Phase 13: Advanced Recovery, URL Refresh & Segment Integrity
 *Focus: Robustness against expired credentials, server-side changes, and network corruption.*
 
-*   **[ ] URL Refresh Hook**: Add `OnUrlExpiredListener` or a `UrlProvider` to `DownloadRequest` that allows fetching a fresh URL (with new tokens) when a download fails with 401/403, resuming from the same offset.
-*   **[ ] Cookie Synchronization**: Ensure cookies from the initial metadata probe are correctly propagated to all parallel part-download requests.
-*   **[ ] Per-Segment Hash Validation (Chunk Integrity)**: Support optional block-level checksum maps (`ChunkChecksum`) so corrupted HTTP range segments are detected during transfer and retried individually without discarding already-downloaded valid parts.
+*   **[x] URL Refresh Hook**: Add `OnUrlExpiredListener` or a `UrlProvider` to `DownloadRequest` that allows fetching a fresh URL (with new tokens) when a download fails with 401/403, resuming from the same offset.
+*   **[x] Cookie Synchronization**: Ensure cookies from the initial metadata probe are correctly propagated to all parallel part-download requests.
+*   **[x] Per-Segment Hash Validation (Chunk Integrity)**: Support optional block-level checksum maps (`ChunkChecksum`) so corrupted HTTP range segments are detected during transfer and retried individually without discarding already-downloaded valid parts.
 
 ### Phase 13 Workflow
-*   **[ ] Steps**:
-    *   [ ] Create a new feature/enhancement branch `feature/phase-13-recovery-refresh`.
-    *   [ ] Implement refresh logic, cookie propagation, and per-segment chunk validation.
-    *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
-    *   [ ] Update `README.md` comprehensively with URL refresh examples, chunk integrity, and cookie management docs.
-    *   [ ] Increase version in `gradle.properties`.
-    *   [ ] Commit with proper message.
+*   **[x] Steps**:
+    *   [x] Create a new feature/enhancement branch `feature/phase-13-recovery-refresh`.
+    *   [x] Implementation of refresh logic, cookie propagation, and per-segment chunk validation.
+    *   [x] Full test coverage and all tests pass.
+    *   [x] Build success.
+    *   [x] Update `README.md` comprehensively with URL refresh examples, chunk integrity, and cookie management docs.
+    *   [x] Increase version in `gradle.properties`.
+    *   [x] Commit with proper message.
 
 ---
 

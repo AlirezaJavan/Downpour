@@ -66,7 +66,7 @@ Downpour requires several permissions to operate reliably in the background. Whi
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.github.alirezajavan:downpour:0.8.0")
+    implementation("io.github.alirezajavan:downpour:0.12.0")
 }
 ```
 
@@ -266,12 +266,43 @@ Provide alternate URLs with `mirror(...)` / `mirrors(...)`. On each retry, Downp
 
 ### Integrity verification
 
+Downpour supports both full-file and per-segment (chunk) integrity verification.
+
+**Full-file verification**:
 ```kotlin
 downloadRequest(url, path) {
     checksum(Checksum(ChecksumAlgorithm.SHA256, "9f86d08...")) // MD5 | SHA1 | SHA256
 }
 ```
 The file is streamed through the digest on completion; a mismatch fails the download with `DownloadError.ContentValidation`.
+
+**Per-segment (chunk) verification**:
+For high-reliability environments, you can provide a map of checksums for fixed-size segments. This catches corruption early during the transfer and allows retrying individual segments rather than the entire file.
+
+```kotlin
+downloadRequest(url, path) {
+    chunkChecksum(
+        ChunkChecksum(
+            chunkSize = 1024 * 1024, // 1 MB
+            algorithm = ChecksumAlgorithm.SHA256,
+            checksums = mapOf(0L to "hash1", 1048576L to "hash2", ...)
+        )
+    )
+}
+```
+
+### URL Refresh Hook (Auth Recovery)
+
+When a download fails with HTTP 401 Unauthorized or 403 Forbidden, Downpour can automatically fetch a fresh URL (e.g. with a new OAuth token or pre-signed signature) and resume from the same offset.
+
+```kotlin
+downloadRequest(url, path) {
+    urlProvider { id, oldUrl ->
+        // Fetch new URL from your API
+        api.getFreshDownloadUrl(id) 
+    }
+}
+```
 
 ### Extension hooks
 

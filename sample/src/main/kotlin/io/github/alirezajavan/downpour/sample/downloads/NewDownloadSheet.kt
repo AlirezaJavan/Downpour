@@ -17,13 +17,13 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.ConflictStrategy
+import io.github.alirezajavan.downpour.api.DownloadRequest
 import io.github.alirezajavan.downpour.api.DuplicatePolicy
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
@@ -172,8 +173,8 @@ fun NewDownloadSheet(
                 Slider(
                     value = form.maxConnections.toFloat(),
                     onValueChange = { form = form.copy(maxConnections = it.toInt()) },
-                    valueRange = 1f..16f,
-                    steps = 14,
+                    valueRange = DownloadRequest.MIN_CONNECTIONS.toFloat()..DownloadRequest.MAX_CONNECTIONS.toFloat(),
+                    steps = DownloadRequest.MAX_CONNECTIONS - DownloadRequest.MIN_CONNECTIONS - 1,
                 )
             }
 
@@ -209,6 +210,16 @@ fun NewDownloadSheet(
                     form = form.copy(requiresStorageNotLow = it)
                 }
 
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text("Phase 13: Integrity & Recovery", style = MaterialTheme.typography.titleSmall)
+
+                LabeledSwitch("Use URL Refresh Hook", form.useUrlProvider) {
+                    form = form.copy(useUrlProvider = it)
+                }
+                LabeledSwitch("Use Chunk Checksum (1MB segments)", form.useChunkChecksum) {
+                    form = form.copy(useChunkChecksum = it)
+                }
+
                 var algorithmExpanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = algorithmExpanded,
@@ -220,7 +231,7 @@ fun NewDownloadSheet(
                         readOnly = true,
                         label = { Text("Checksum algorithm") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = algorithmExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
                     )
                     ExposedDropdownMenu(
                         expanded = algorithmExpanded,

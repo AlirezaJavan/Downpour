@@ -11,6 +11,7 @@ public class DownloadRequest private constructor(
     public val retryPolicy: RetryPolicy,
     public val maxBytesPerSecond: Long,
     public val checksum: Checksum?,
+    public val chunkChecksum: ChunkChecksum? = null,
     public val tag: String?,
     public val workerClass: String?,
     public val metadata: Map<String, String>,
@@ -20,11 +21,8 @@ public class DownloadRequest private constructor(
     public val requiresStorageNotLow: Boolean,
     public val schedule: DownloadSchedule,
     public val duplicatePolicy: DuplicatePolicy?,
+    public val urlProvider: UrlProvider? = null,
 ) {
-    @Deprecated("Use destination instead", ReplaceWith("destination"))
-    public val destinationPath: String
-        get() = (destination as? DownloadDestination.File)?.path ?: ""
-
     public class Builder(
         private val url: String,
         private val destination: DownloadDestination,
@@ -42,6 +40,7 @@ public class DownloadRequest private constructor(
         private var retryPolicy: RetryPolicy = RetryPolicy()
         private var maxBytesPerSecond: Long = UNLIMITED
         private var checksum: Checksum? = null
+        private var chunkChecksum: ChunkChecksum? = null
         private var tag: String? = null
         private var workerClass: String? = null
         private var requiresCharging: Boolean = false
@@ -49,6 +48,7 @@ public class DownloadRequest private constructor(
         private var requiresStorageNotLow: Boolean = false
         private var schedule: DownloadSchedule = DownloadSchedule()
         private var duplicatePolicy: DuplicatePolicy? = null
+        private var urlProvider: UrlProvider? = null
 
         public fun header(
             name: String,
@@ -80,6 +80,8 @@ public class DownloadRequest private constructor(
             }
 
         public fun checksum(checksum: Checksum): Builder = apply { this.checksum = checksum }
+
+        public fun chunkChecksum(chunkChecksum: ChunkChecksum): Builder = apply { this.chunkChecksum = chunkChecksum }
 
         public fun tag(tag: String): Builder = apply { this.tag = tag }
 
@@ -118,6 +120,8 @@ public class DownloadRequest private constructor(
 
         public fun duplicatePolicy(policy: DuplicatePolicy): Builder = apply { this.duplicatePolicy = policy }
 
+        public fun urlProvider(provider: UrlProvider): Builder = apply { this.urlProvider = provider }
+
         public fun build(): DownloadRequest {
             require(url.isNotBlank()) { "url must not be blank" }
             return DownloadRequest(
@@ -131,6 +135,7 @@ public class DownloadRequest private constructor(
                 retryPolicy = retryPolicy,
                 maxBytesPerSecond = maxBytesPerSecond,
                 checksum = checksum,
+                chunkChecksum = chunkChecksum,
                 tag = tag,
                 workerClass = workerClass,
                 metadata = metadata.toMap(),
@@ -140,6 +145,7 @@ public class DownloadRequest private constructor(
                 requiresStorageNotLow = requiresStorageNotLow,
                 schedule = schedule,
                 duplicatePolicy = duplicatePolicy,
+                urlProvider = urlProvider,
             )
         }
     }

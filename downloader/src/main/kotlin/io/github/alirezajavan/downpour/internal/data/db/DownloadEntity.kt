@@ -3,6 +3,7 @@ package io.github.alirezajavan.downpour.internal.data.db
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import io.github.alirezajavan.downpour.api.ChunkChecksum
 import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 
@@ -34,6 +35,7 @@ internal data class DownloadEntity(
     val maxBytesPerSecond: Long,
     val checksumAlgorithm: Int?,
     val checksumValue: String?,
+    val chunkChecksum: ChunkChecksum? = null,
     val maxRetries: Int,
     val initialBackoffMillis: Long,
     val backoffMultiplier: Double,

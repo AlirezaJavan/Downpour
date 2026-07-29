@@ -14,8 +14,4 @@ public data class DownloadItem(
     val metadata: Map<String, String>,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
-) {
-    @Deprecated("Use destination instead")
-    val filePath: String
-        get() = (destination as? DownloadDestination.File)?.path ?: ""
-}
+)

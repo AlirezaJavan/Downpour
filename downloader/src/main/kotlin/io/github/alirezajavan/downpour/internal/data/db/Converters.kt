@@ -1,11 +1,18 @@
 package io.github.alirezajavan.downpour.internal.data.db
 
 import androidx.room.TypeConverter
+import io.github.alirezajavan.downpour.api.ChunkChecksum
 import io.github.alirezajavan.downpour.api.ConflictStrategy
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import kotlinx.serialization.json.Json
 
 internal class Converters {
+    @TypeConverter
+    fun fromChunkChecksum(value: ChunkChecksum?): String? = value?.let { json.encodeToString(it) }
+
+    @TypeConverter
+    fun toChunkChecksum(value: String?): ChunkChecksum? = value?.let { json.decodeFromString(it) }
+
     @TypeConverter
     fun fromStringMap(value: Map<String, String>): String = json.encodeToString(value)
 

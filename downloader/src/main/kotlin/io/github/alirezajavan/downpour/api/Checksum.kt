@@ -1,5 +1,8 @@
 package io.github.alirezajavan.downpour.api
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 public enum class ChecksumAlgorithm(
     internal val javaName: String,
 ) {
