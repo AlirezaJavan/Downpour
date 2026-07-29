@@ -55,7 +55,7 @@ internal class DownloaderGraph private constructor(
                 appContext,
                 DownloadDatabase::class.java,
                 DownloadDatabase.NAME,
-            ).fallbackToDestructiveMigration(false)
+            ).fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
     val repository = DownloadRepository(database.downloadDao())
