@@ -18,7 +18,7 @@ internal class DownloadPlanner(
         fileLength: Long,
         activeConnections: Int = -1,
     ): DownloadPlan {
-        val ifRange = info.etag ?: info.lastModified
+        val ifRange = info.eTag ?: info.lastModified
         val requestedConnections = if (activeConnections > 0) activeConnections else entity.maxConnections
 
         // A download that was ever multi-connection preallocates the destination file to its full
@@ -115,7 +115,7 @@ internal class DownloadPlanner(
         return DownloadPlan(
             info.totalBytes,
             persistedParts,
-            info.etag ?: info.lastModified,
+            info.eTag ?: info.lastModified,
             isMultiConnection = true,
         )
     }
@@ -160,7 +160,7 @@ internal class DownloadPlanner(
         return DownloadPlan(
             info.totalBytes,
             persistedParts,
-            info.etag ?: info.lastModified,
+            info.eTag ?: info.lastModified,
             isMultiConnection = true,
         )
     }
@@ -201,7 +201,7 @@ internal class DownloadPlanner(
     private fun isResumeValid(
         entity: DownloadEntity,
         info: RemoteFileInfo,
-    ): Boolean = entity.etag == info.etag && entity.lastModified == info.lastModified
+    ): Boolean = entity.etag == info.eTag && entity.lastModified == info.lastModified
 
     private suspend fun freshMultiConnectionPlan(
         entity: DownloadEntity,

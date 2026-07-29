@@ -5,7 +5,7 @@ import io.github.alirezajavan.downpour.api.DownloadProgress
 internal data class RemoteFileInfo(
     val totalBytes: Long,
     val acceptsRanges: Boolean,
-    val etag: String?,
+    val eTag: String?,
     val lastModified: String?,
     val contentType: String?,
     val contentDisposition: String?,

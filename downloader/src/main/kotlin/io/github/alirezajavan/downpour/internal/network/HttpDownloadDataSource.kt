@@ -146,7 +146,7 @@ internal class HttpDownloadDataSource(
         return RemoteFileInfo(
             totalBytes = total,
             acceptsRanges = acceptsRanges,
-            etag = etag,
+            eTag = etag,
             lastModified = lastModified,
             contentType = contentType,
             contentDisposition = contentDisposition,

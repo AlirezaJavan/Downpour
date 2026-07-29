@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.alirezajavan.downpour.sample.core.displayName
-import io.github.alirezajavan.downpour.sample.core.formatBytes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

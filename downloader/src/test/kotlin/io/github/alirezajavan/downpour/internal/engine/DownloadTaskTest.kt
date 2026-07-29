@@ -49,7 +49,7 @@ class DownloadTaskTest {
                 RemoteFileInfo(
                     totalBytes = 100,
                     acceptsRanges = true,
-                    etag = "etag",
+                    eTag = "etag",
                     lastModified = "date",
                     contentType = "application/bin",
                     contentDisposition = null,

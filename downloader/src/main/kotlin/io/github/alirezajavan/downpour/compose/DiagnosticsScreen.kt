@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import io.github.alirezajavan.downpour.api.DiagnosticReport
 import io.github.alirezajavan.downpour.api.PartProgress
 import java.util.Locale
+import kotlin.math.log10
+import kotlin.math.pow
 
 @Composable
 public fun DiagnosticsScreen(
@@ -198,11 +199,11 @@ private fun DiagnosticDetailRow(
 private fun formatByteSize(bytes: Long): String {
     if (bytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB")
-    val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+    val digitGroups = (log10(bytes.toDouble()) / log10(1024.0)).toInt()
     return String.format(
         Locale.US,
         "%.1f %s",
-        bytes / Math.pow(1024.0, digitGroups.toDouble()),
+        bytes / 1024.0.pow(digitGroups.toDouble()),
         units[digitGroups.coerceAtMost(units.size - 1)],
     )
 }

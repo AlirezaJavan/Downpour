@@ -62,6 +62,6 @@ internal class AdaptiveDns(
     override fun lookup(hostname: String): List<InetAddress> {
         val addresses = Dns.SYSTEM.lookup(hostname)
         if (!tracker.isIpv6Broken) return addresses
-        return addresses.filter { it is Inet4Address }.ifEmpty { addresses }
+        return addresses.filterIsInstance<Inet4Address>().ifEmpty { addresses }
     }
 }

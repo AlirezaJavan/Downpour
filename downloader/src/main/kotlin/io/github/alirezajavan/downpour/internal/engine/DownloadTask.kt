@@ -201,7 +201,7 @@ internal class DownloadTask(
             id = entity.id,
             supportsResume = info.acceptsRanges,
             total = info.totalBytes,
-            etag = info.etag,
+            etag = info.eTag,
             lastModified = info.lastModified,
         )
         return info

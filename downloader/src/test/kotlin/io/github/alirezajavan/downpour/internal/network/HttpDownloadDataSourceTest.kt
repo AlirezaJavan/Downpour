@@ -43,7 +43,7 @@ class HttpDownloadDataSourceTest {
 
             assertThat(info.totalBytes).isEqualTo(1000)
             assertThat(info.acceptsRanges).isTrue()
-            assertThat(info.etag).isEqualTo("test-etag")
+            assertThat(info.eTag).isEqualTo("test-etag")
         }
 
     @Test

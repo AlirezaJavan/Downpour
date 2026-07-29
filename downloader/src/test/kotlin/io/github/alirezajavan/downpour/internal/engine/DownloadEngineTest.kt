@@ -180,7 +180,9 @@ class DownloadEngineTest {
 
             val runner = mockk<DownloadTaskRunner>(relaxed = true)
             // Return Failed(401) then Success
-            coEvery { runner.run(any()) } returns TaskResult.Failed(DownloadError.Http(401)) andThen TaskResult.Completed(1000L)
+            coEvery { runner.run(any()) } returns
+                TaskResult.Failed(DownloadError.Http(401)) andThen
+                TaskResult.Completed(1000L)
             every { taskFactory.invoke() } returns runner
 
             val urlProvider = mockk<UrlProvider>()

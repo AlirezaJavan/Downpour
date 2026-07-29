@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * Fire-and-forget event bus so background hooks (post-processors, listeners) that don't run on the
- * main thread and don't own a Composable can still surface a Snackbar.
+ * main thread and don't own a Composable can still surface a Snack bar.
  */
 object SampleEvents {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)

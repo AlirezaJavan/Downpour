@@ -2,12 +2,11 @@ package io.github.alirezajavan.downpour.internal.engine
 
 internal class ConnectionTuner(
     minConnections: Int,
-    maxConnections: Int,
+    private val maxConnections: Int,
 ) {
     // A caller-supplied minConnections above the per-request maxConnections cap must not win --
     // the request's own cap is the harder constraint.
     private val minConnections = minConnections.coerceAtMost(maxConnections)
-    private val maxConnections = maxConnections
     private var lastConnections = -1
     private var lastSpeed = 0L
 

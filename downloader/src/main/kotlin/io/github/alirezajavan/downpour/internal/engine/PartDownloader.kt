@@ -120,15 +120,11 @@ internal class PartDownloader(
         startPosition: Long,
         context: PartContext,
     ) {
-        val chunkConfig = context.chunkChecksum
-        val digest = chunkConfig?.let { MessageDigest.getInstance(it.algorithm.javaName) }
-        var bytesInCurrentChunk = 0L
-        var isVerifying = chunkConfig != null && (startPosition % chunkConfig.chunkSize == 0L)
-        var chunkOffset =
-            if (chunkConfig != null) {
-                (startPosition / chunkConfig.chunkSize) * chunkConfig.chunkSize
-            } else {
-                0L
+        val chunkHasher =
+            context.chunkChecksum?.let { config ->
+                ChunkHasher(config, startPosition) { digest, offset, cfg ->
+                    verifyChunk(digest, offset, cfg)
+                }
             }
 
         fileStore.openWritable(context.destination).use { sink ->
@@ -146,60 +142,78 @@ internal class PartDownloader(
 
                 val read = readChunk(stream, buffer)
                 if (read == END_OF_STREAM) {
-                    if (isVerifying && digest != null && bytesInCurrentChunk > 0) {
-                        verifyChunk(digest, chunkOffset, chunkConfig)
-                    }
+                    chunkHasher?.finalize()
                     break
                 }
 
                 sink.write(buffer, 0, read)
-
-                if (digest != null && chunkConfig != null) {
-                    var bufferOffset = 0
-                    var remainingRead = read
-                    while (remainingRead > 0) {
-                        if (isVerifying) {
-                            val spaceInChunk = chunkConfig.chunkSize - bytesInCurrentChunk
-                            val toProcess = remainingRead.toLong().coerceAtMost(spaceInChunk).toInt()
-                            digest.update(buffer, bufferOffset, toProcess)
-                            bytesInCurrentChunk += toProcess
-                            bufferOffset += toProcess
-                            remainingRead -= toProcess
-                            absoluteOffset += toProcess
-
-                            if (bytesInCurrentChunk == chunkConfig.chunkSize) {
-                                verifyChunk(digest, chunkOffset, chunkConfig)
-                                digest.reset()
-                                bytesInCurrentChunk = 0
-                                chunkOffset += chunkConfig.chunkSize
-                            }
-                        } else {
-                            val nextBoundary =
-                                ((absoluteOffset / chunkConfig.chunkSize) + 1) * chunkConfig.chunkSize
-                            val bytesToBoundary = (nextBoundary - absoluteOffset).toInt()
-
-                            if (remainingRead >= bytesToBoundary) {
-                                isVerifying = true
-                                bufferOffset += bytesToBoundary
-                                remainingRead -= bytesToBoundary
-                                absoluteOffset += bytesToBoundary
-                                digest.reset()
-                                bytesInCurrentChunk = 0
-                                chunkOffset = nextBoundary
-                            } else {
-                                absoluteOffset += remainingRead
-                                remainingRead = 0
-                            }
-                        }
-                    }
-                } else {
-                    absoluteOffset += read
-                }
+                chunkHasher?.update(buffer, 0, read)
+                absoluteOffset += read
 
                 bytesSinceSpaceCheck += read.toLong()
                 context.progress.addAndGet(read.toLong())
                 context.partOffset.set(absoluteOffset)
                 throttle(context, read)
+            }
+        }
+    }
+
+    private class ChunkHasher(
+        private val config: ChunkChecksum,
+        startPosition: Long,
+        private val onVerify: (MessageDigest, Long, ChunkChecksum) -> Unit,
+    ) {
+        private val digest = MessageDigest.getInstance(config.algorithm.javaName)
+        private var bytesInCurrentChunk = 0L
+        private var chunkOffset = (startPosition / config.chunkSize) * config.chunkSize
+        private var isVerifying = (startPosition % config.chunkSize == 0L)
+        private var absoluteOffset = startPosition
+
+        fun update(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
+            var bufferOffset = offset
+            var remainingRead = length
+            while (remainingRead > 0) {
+                if (isVerifying) {
+                    val spaceInChunk = config.chunkSize - bytesInCurrentChunk
+                    val toProcess = remainingRead.toLong().coerceAtMost(spaceInChunk).toInt()
+                    digest.update(buffer, bufferOffset, toProcess)
+                    bytesInCurrentChunk += toProcess
+                    bufferOffset += toProcess
+                    remainingRead -= toProcess
+                    absoluteOffset += toProcess
+
+                    if (bytesInCurrentChunk == config.chunkSize) {
+                        onVerify(digest, chunkOffset, config)
+                        digest.reset()
+                        bytesInCurrentChunk = 0
+                        chunkOffset += config.chunkSize
+                    }
+                } else {
+                    val nextBoundary = ((absoluteOffset / config.chunkSize) + 1) * config.chunkSize
+                    val bytesToBoundary = (nextBoundary - absoluteOffset).toInt()
+                    if (remainingRead >= bytesToBoundary) {
+                        isVerifying = true
+                        bufferOffset += bytesToBoundary
+                        remainingRead -= bytesToBoundary
+                        absoluteOffset += bytesToBoundary
+                        digest.reset()
+                        bytesInCurrentChunk = 0
+                        chunkOffset = nextBoundary
+                    } else {
+                        absoluteOffset += remainingRead
+                        remainingRead = 0
+                    }
+                }
+            }
+        }
+
+        fun finalize() {
+            if (isVerifying && bytesInCurrentChunk > 0) {
+                onVerify(digest, chunkOffset, config)
             }
         }
     }
@@ -235,7 +249,9 @@ internal class PartDownloader(
         buffer: ByteArray,
     ): Int =
         try {
-            stream.read(buffer)
+            withContext(Dispatchers.IO) {
+                stream.read(buffer)
+            }
         } catch (io: IOException) {
             currentCoroutineContext().ensureActive()
             throw DownloadError.Connection(io)

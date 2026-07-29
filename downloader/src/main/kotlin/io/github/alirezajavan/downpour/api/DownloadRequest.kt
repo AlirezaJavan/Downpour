@@ -1,5 +1,6 @@
 package io.github.alirezajavan.downpour.api
 
+@Suppress("LongParameterList")
 public class DownloadRequest private constructor(
     public val url: String,
     public val destination: DownloadDestination,

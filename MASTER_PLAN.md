@@ -260,7 +260,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Create a new feature/enhancement branch `feature/phase-14-system-integration`.
     *   [ ] Implement MediaStore sync, intent helpers, and HLS stream segment downloading/stitching.
     *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
+    *   [ ] Build success (assembleDebug, lint, detekt).
     *   [ ] Update `README.md` comprehensively with MediaStore, HLS stream downloading, and Intent usage examples.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
@@ -278,7 +278,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Create a new feature/enhancement branch `feature/phase-15-security`.
     *   [ ] Implement PGP verification and encrypted storage support.
     *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
+    *   [ ] Build success (assembleDebug, lint, detekt).
     *   [ ] Update `README.md` comprehensively with security and encryption examples.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
@@ -296,7 +296,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Create a new feature/enhancement branch `feature/phase-16-background-resilience`.
     *   [ ] Implement WorkManager fallback engine and metered data quota manager.
     *   [ ] Full test coverage (>90%) and all tests pass.
-    *   [ ] Build success (`assembleDebug`, `lint`).
+    *   [ ] Build success (`assembleDebug`, `lint`, `detekt`).
     *   [ ] Update `README.md` comprehensively with Android 14/15 WorkManager fallback and cellular quota docs.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
@@ -316,7 +316,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Create a new feature/enhancement branch `feature/phase-17-dependencies-bundles-archives`.
     *   [ ] Implement request dependency graph, multi-file download bundles, selective remote ZIP parser, and unzip post-processor.
     *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
+    *   [ ] Build success (assembleDebug, lint, detekt).
     *   [ ] Update `README.md` comprehensively with dependency chaining, multi-file bundles, and ZIP extraction examples.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.
@@ -334,7 +334,7 @@ This roadmap outlines the evolution of the **Downpour** library from a core engi
     *   [ ] Create a new feature/enhancement branch `feature/phase-18-telemetry-analytics`.
     *   [ ] Implement analytics event emitter and speed history timeline tracker.
     *   [ ] Full test coverage and all tests pass.
-    *   [ ] Build success.
+    *   [ ] Build success (assembleDebug, lint, detekt).
     *   [ ] Update `README.md` comprehensively with analytics and performance profiling docs.
     *   [ ] Increase version in `gradle.properties`.
     *   [ ] Commit with proper message.

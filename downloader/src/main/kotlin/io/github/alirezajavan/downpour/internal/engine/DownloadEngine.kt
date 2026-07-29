@@ -673,7 +673,11 @@ internal class DownloadEngine(
     ) {
         logger.e("Download failed: ${entity.id}. Error: ${error.message}", error)
 
-        if (error is DownloadError.Http && (error.statusCode == HTTP_UNAUTHORIZED || error.statusCode == HTTP_FORBIDDEN)) {
+        val isAuthError =
+            error is DownloadError.Http &&
+                (error.statusCode == HTTP_UNAUTHORIZED || error.statusCode == HTTP_FORBIDDEN)
+
+        if (isAuthError) {
             val provider = urlProviders[entity.id]
             if (provider != null) {
                 val newUrl = provider.getNewUrl(entity.id, entity.url)

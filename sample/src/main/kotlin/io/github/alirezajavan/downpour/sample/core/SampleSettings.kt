@@ -3,7 +3,7 @@ package io.github.alirezajavan.downpour.sample.core
 import android.content.Context
 import androidx.core.content.edit
 
-/** Persisted [DownloadManagerConfig]-shaping knobs the Settings screen lets a user tweak. */
+/** Persisted config shaping knobs the Settings screen lets a user tweak. */
 data class SampleSettings(
     val maxConcurrentDownloads: Int = 3,
     val globalBandwidthCapMbps: Int = 0,
@@ -16,8 +16,7 @@ data class SampleSettings(
 
 /**
  * The Settings screen's "Apply" action pushes these values into a live rebuild of the shared
- * [io.github.alirezajavan.downpour.api.DownloadManager] via [SampleDownpour.applySettings] and
- * [Downpour.reconfigure] -- no process restart needed.
+ * [io.github.alirezajavan.downpour.api.DownloadManager] via [SampleDownpour.applySettings].
  */
 class SampleSettingsStore(
     context: Context,

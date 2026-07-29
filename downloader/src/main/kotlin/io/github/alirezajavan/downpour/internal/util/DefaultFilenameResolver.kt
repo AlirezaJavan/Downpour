@@ -24,7 +24,7 @@ internal object DefaultFilenameResolver : FilenameResolver {
                 MimeTypeMap.getSingleton().getExtensionFromMimeType(it.substringBefore(';'))
             }
 
-        val baseName = if (fromUrl.isNotBlank()) fromUrl else "download_${System.currentTimeMillis()}"
+        val baseName = fromUrl.ifBlank { "download_${System.currentTimeMillis()}" }
         val sanitizedBase = sanitizeFilename(baseName)
         return if (!extension.isNullOrBlank()) "$sanitizedBase.$extension" else sanitizedBase
     }
@@ -44,7 +44,7 @@ internal object DefaultFilenameResolver : FilenameResolver {
         if (standardMatch != null) {
             val quoted = standardMatch.groupValues[1]
             val unquoted = standardMatch.groupValues[2]
-            val value = if (quoted.isNotEmpty()) quoted else unquoted
+            val value = quoted.ifEmpty { unquoted }
             if (value.isNotBlank()) {
                 return sanitizeFilename(value)
             }

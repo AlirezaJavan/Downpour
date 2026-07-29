@@ -236,7 +236,10 @@ fun ConstraintsScreen(viewModel: ConstraintsViewModel = viewModel()) {
                         readOnly = true,
                         label = { Text("Checksum algorithm") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = algorithmExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
                     )
                     ExposedDropdownMenu(
                         expanded = algorithmExpanded,
