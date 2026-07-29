@@ -6,6 +6,7 @@ import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadSchedule
 import io.github.alirezajavan.downpour.api.NetworkType
 import io.github.alirezajavan.downpour.api.Priority
+import io.github.alirezajavan.downpour.api.UrlProvider
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
@@ -77,6 +78,7 @@ internal class DownloadEngine(
     private val tuningJobs = ConcurrentHashMap<String, Job>()
     private val tuners = ConcurrentHashMap<String, ConnectionTuner>()
     private val taskRateLimiters = ConcurrentHashMap<String, RateLimiter>()
+    private val urlProviders = ConcurrentHashMap<String, UrlProvider>()
 
     // Downloads the server has 429'd for concurrency. Adaptive tuning is never (re)started for
     // these: a fresh ConnectionTuner always tries to *increase* connections on its first evaluation
@@ -130,6 +132,15 @@ internal class DownloadEngine(
         scope.launch { schedule() }
     }
 
+    fun registerUrlProvider(
+        id: String,
+        provider: UrlProvider?,
+    ) {
+        if (provider != null) {
+            urlProviders[id] = provider
+        }
+    }
+
     suspend fun pause(id: String) {
         scheduleMutex.withLock {
             cancelRetry(id)
@@ -180,6 +191,7 @@ internal class DownloadEngine(
                 clearRateLimited(entity.id)
                 discardArtifacts(entity)
                 tuners.remove(entity.id)
+                urlProviders.remove(entity.id)
             }
         }
         schedule()
@@ -197,6 +209,7 @@ internal class DownloadEngine(
                 clearRateLimited(entity.id)
                 if (deleteFiles) fileStore.delete(entity.toDestination())
                 tuners.remove(entity.id)
+                urlProviders.remove(entity.id)
             }
             repository.deleteByTag(tag)
         }
@@ -233,6 +246,7 @@ internal class DownloadEngine(
             clearRateLimited(id)
             discardArtifacts(entity)
             tuners.remove(id)
+            urlProviders.remove(id)
         }
         schedule()
     }
@@ -277,6 +291,7 @@ internal class DownloadEngine(
             cancelJob(id)
             clearRateLimited(id)
             tuners.remove(id)
+            urlProviders.remove(id)
             val entity = repository.getEntity(id)
             if (deleteFile) entity?.let { fileStore.delete(it.toDestination()) }
             repository.delete(id)
@@ -633,6 +648,7 @@ internal class DownloadEngine(
                 repository.setStatus(entity.id, DownloadStatus.COMPLETED)
                 repository.clearParts(entity.id)
                 tuners.remove(entity.id)
+                urlProviders.remove(entity.id)
                 true
             }
         if (!finalized) return
@@ -656,6 +672,25 @@ internal class DownloadEngine(
         error: DownloadError,
     ) {
         logger.e("Download failed: ${entity.id}. Error: ${error.message}", error)
+
+        if (error is DownloadError.Http && (error.statusCode == HTTP_UNAUTHORIZED || error.statusCode == HTTP_FORBIDDEN)) {
+            val provider = urlProviders[entity.id]
+            if (provider != null) {
+                val newUrl = provider.getNewUrl(entity.id, entity.url)
+                if (newUrl != null) {
+                    logger.i("URL expired for ${entity.id}, obtained fresh URL from provider")
+                    repository.updateUrl(entity.id, newUrl)
+                    scheduleMutex.withLock {
+                        if (repository.getEntity(entity.id)?.status == DownloadStatus.RUNNING) {
+                            repository.setStatus(entity.id, DownloadStatus.QUEUED)
+                        }
+                    }
+                    schedule()
+                    return
+                }
+            }
+        }
+
         scheduleMutex.withLock {
             // If the row is no longer RUNNING, the user paused/canceled/removed it while the task
             // was unwinding. Honor that instead of recording an error or scheduling a retry.
@@ -672,6 +707,7 @@ internal class DownloadEngine(
                 )
                 repository.setError(entity.id, effectiveError, attempt)
                 tuners.remove(entity.id)
+                urlProviders.remove(entity.id)
             }
         }
     }
@@ -768,6 +804,8 @@ internal class DownloadEngine(
     private companion object {
         const val QUEUE_SCAN_LIMIT = 256
         const val MAX_PARTS = 16
+        const val HTTP_UNAUTHORIZED = 401
+        const val HTTP_FORBIDDEN = 403
         const val HTTP_TOO_MANY_REQUESTS = 429
         val ACTIVE_STATUSES =
             listOf(

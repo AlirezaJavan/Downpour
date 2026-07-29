@@ -4,12 +4,12 @@ import io.github.alirezajavan.downpour.api.Checksum
 import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
+import io.github.alirezajavan.downpour.internal.util.HexUtils.toHex
 import java.security.MessageDigest
 
 internal object ChecksumVerifier {
     private const val BUFFER_SIZE = 64 * 1024
     private const val END_OF_STREAM = -1
-    private const val HEX_BYTE_MASK = 0xFF
 
     fun verify(
         fileStore: FileStore,
@@ -40,12 +40,4 @@ internal object ChecksumVerifier {
         }
         return messageDigest.digest().toHex()
     }
-
-    private fun ByteArray.toHex(): String =
-        joinToString("") { byte ->
-            (byte.toInt() and HEX_BYTE_MASK).toString(HEX_BASE).padStart(HEX_WIDTH, '0')
-        }
-
-    private const val HEX_BASE = 16
-    private const val HEX_WIDTH = 2
 }

@@ -268,6 +268,7 @@ internal class DownloadTask(
                 progress = transfer.progress,
                 partOffset = transfer.offsetOf(part),
                 rateLimiters = transfer.rateLimiters,
+                chunkChecksum = transfer.entity.chunkChecksum,
             )
         partDownloader.download(context)
     }

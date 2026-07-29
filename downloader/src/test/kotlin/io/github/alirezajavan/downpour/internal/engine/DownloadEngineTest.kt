@@ -1,10 +1,14 @@
 package io.github.alirezajavan.downpour.internal.engine
 
+import com.google.common.truth.Truth.assertThat
+import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.api.DownloadManagerConfig
 import io.github.alirezajavan.downpour.api.DownloadSchedule
+import io.github.alirezajavan.downpour.api.UrlProvider
 import io.github.alirezajavan.downpour.internal.data.DownloadRepository
 import io.github.alirezajavan.downpour.internal.data.DownloadStatus
 import io.github.alirezajavan.downpour.internal.data.db.DownloadEntity
+import io.github.alirezajavan.downpour.internal.data.db.FakeDownloadDao
 import io.github.alirezajavan.downpour.internal.device.DeviceState
 import io.github.alirezajavan.downpour.internal.device.DeviceStateMonitor
 import io.github.alirezajavan.downpour.internal.network.NetworkMonitor
@@ -16,6 +20,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
@@ -139,6 +144,56 @@ class DownloadEngineTest {
             testScope.testScheduler.runCurrent()
 
             coVerify { repository.getEntity("id") }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `engine refreshes URL on 401 if provider is registered`() =
+        runTest {
+            val fakeDao = FakeDownloadDao()
+            val repository = DownloadRepository(fakeDao)
+            val engine =
+                DownloadEngine(
+                    scope = this,
+                    repository = repository,
+                    taskFactory = taskFactory,
+                    config = config,
+                    serviceController = serviceController,
+                    networkMonitor = networkMonitor,
+                    deviceStateMonitor = deviceStateMonitor,
+                    scheduler = scheduler,
+                    fileStore = fileStore,
+                    logger = NoOpLogger,
+                )
+
+            val entity = createMockEntity("id", supportsResume = true).copy(status = DownloadStatus.QUEUED)
+            repository.insert(entity)
+
+            every { networkMonitor.snapshot() } returns NetworkStatus(isConnected = true, isMetered = false, isNotRoaming = true)
+            every { deviceStateMonitor.snapshot() } returns
+                DeviceState(
+                    isCharging = false,
+                    isBatteryLow = false,
+                    isStorageLow = false,
+                    currentTimeMillis = 0,
+                )
+
+            val runner = mockk<DownloadTaskRunner>(relaxed = true)
+            // Return Failed(401) then Success
+            coEvery { runner.run(any()) } returns TaskResult.Failed(DownloadError.Http(401)) andThen TaskResult.Completed(1000L)
+            every { taskFactory.invoke() } returns runner
+
+            val urlProvider = mockk<UrlProvider>()
+            coEvery { urlProvider.getNewUrl("id", "url") } returns "new-url"
+
+            engine.registerUrlProvider("id", urlProvider)
+            engine.onEnqueued()
+
+            advanceUntilIdle()
+
+            val updatedEntity = repository.getEntity("id")
+            assertThat(updatedEntity?.url).isEqualTo("new-url")
+            assertThat(updatedEntity?.status).isEqualTo(DownloadStatus.COMPLETED)
         }
 
     private fun createMockEntity(

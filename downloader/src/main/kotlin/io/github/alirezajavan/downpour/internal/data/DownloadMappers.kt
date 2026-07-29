@@ -47,6 +47,7 @@ internal fun DownloadRequest.toEntity(
         maxBytesPerSecond = maxBytesPerSecond,
         checksumAlgorithm = checksum?.algorithm?.ordinal,
         checksumValue = checksum?.expectedHex,
+        chunkChecksum = chunkChecksum,
         maxRetries = retryPolicy.maxRetries,
         initialBackoffMillis = retryPolicy.initialBackoff.inWholeMilliseconds,
         backoffMultiplier = retryPolicy.backoffMultiplier,

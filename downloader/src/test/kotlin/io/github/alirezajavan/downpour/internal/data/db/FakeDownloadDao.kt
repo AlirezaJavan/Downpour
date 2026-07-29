@@ -54,6 +54,15 @@ internal class FakeDownloadDao : DownloadDao {
         publish()
     }
 
+    override suspend fun updateUrl(
+        id: String,
+        url: String,
+        now: Long,
+    ) {
+        rows[id]?.let { rows[id] = it.copy(url = url, updatedAtMillis = now) }
+        publish()
+    }
+
     override suspend fun updateDestinationPath(
         id: String,
         path: String,

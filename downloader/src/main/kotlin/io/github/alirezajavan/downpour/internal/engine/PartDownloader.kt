@@ -1,8 +1,10 @@
 package io.github.alirezajavan.downpour.internal.engine
 
+import io.github.alirezajavan.downpour.api.ChunkChecksum
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
+import io.github.alirezajavan.downpour.internal.util.HexUtils.toHex
 import io.github.alirezajavan.downpour.internal.util.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -12,6 +14,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Response
 import java.io.IOException
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicLong
 
 internal class PartDownloader(
@@ -117,6 +120,17 @@ internal class PartDownloader(
         startPosition: Long,
         context: PartContext,
     ) {
+        val chunkConfig = context.chunkChecksum
+        val digest = chunkConfig?.let { MessageDigest.getInstance(it.algorithm.javaName) }
+        var bytesInCurrentChunk = 0L
+        var isVerifying = chunkConfig != null && (startPosition % chunkConfig.chunkSize == 0L)
+        var chunkOffset =
+            if (chunkConfig != null) {
+                (startPosition / chunkConfig.chunkSize) * chunkConfig.chunkSize
+            } else {
+                0L
+            }
+
         fileStore.openWritable(context.destination).use { sink ->
             sink.seek(startPosition)
             val buffer = ByteArray(bufferSize)
@@ -131,14 +145,74 @@ internal class PartDownloader(
                 }
 
                 val read = readChunk(stream, buffer)
-                if (read == END_OF_STREAM) break
+                if (read == END_OF_STREAM) {
+                    if (isVerifying && digest != null && bytesInCurrentChunk > 0) {
+                        verifyChunk(digest, chunkOffset, chunkConfig)
+                    }
+                    break
+                }
+
                 sink.write(buffer, 0, read)
-                absoluteOffset += read
-                bytesSinceSpaceCheck += read
+
+                if (digest != null && chunkConfig != null) {
+                    var bufferOffset = 0
+                    var remainingRead = read
+                    while (remainingRead > 0) {
+                        if (isVerifying) {
+                            val spaceInChunk = chunkConfig.chunkSize - bytesInCurrentChunk
+                            val toProcess = remainingRead.toLong().coerceAtMost(spaceInChunk).toInt()
+                            digest.update(buffer, bufferOffset, toProcess)
+                            bytesInCurrentChunk += toProcess
+                            bufferOffset += toProcess
+                            remainingRead -= toProcess
+                            absoluteOffset += toProcess
+
+                            if (bytesInCurrentChunk == chunkConfig.chunkSize) {
+                                verifyChunk(digest, chunkOffset, chunkConfig)
+                                digest.reset()
+                                bytesInCurrentChunk = 0
+                                chunkOffset += chunkConfig.chunkSize
+                            }
+                        } else {
+                            val nextBoundary =
+                                ((absoluteOffset / chunkConfig.chunkSize) + 1) * chunkConfig.chunkSize
+                            val bytesToBoundary = (nextBoundary - absoluteOffset).toInt()
+
+                            if (remainingRead >= bytesToBoundary) {
+                                isVerifying = true
+                                bufferOffset += bytesToBoundary
+                                remainingRead -= bytesToBoundary
+                                absoluteOffset += bytesToBoundary
+                                digest.reset()
+                                bytesInCurrentChunk = 0
+                                chunkOffset = nextBoundary
+                            } else {
+                                absoluteOffset += remainingRead
+                                remainingRead = 0
+                            }
+                        }
+                    }
+                } else {
+                    absoluteOffset += read
+                }
+
+                bytesSinceSpaceCheck += read.toLong()
                 context.progress.addAndGet(read.toLong())
                 context.partOffset.set(absoluteOffset)
                 throttle(context, read)
             }
+        }
+    }
+
+    private fun verifyChunk(
+        digest: MessageDigest,
+        offset: Long,
+        config: ChunkChecksum,
+    ) {
+        val expected = config.checksums[offset] ?: return
+        val actual = digest.digest().toHex()
+        if (!actual.equals(expected, ignoreCase = true)) {
+            throw DownloadError.ContentValidation("Chunk corruption detected at offset $offset")
         }
     }
 
@@ -192,4 +266,5 @@ internal data class PartContext(
     val progress: AtomicLong,
     val partOffset: AtomicLong,
     val rateLimiters: List<RateLimiter>,
+    val chunkChecksum: ChunkChecksum? = null,
 )

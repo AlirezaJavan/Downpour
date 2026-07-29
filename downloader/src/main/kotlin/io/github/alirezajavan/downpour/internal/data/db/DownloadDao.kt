@@ -44,6 +44,13 @@ internal interface DownloadDao {
         now: Long,
     )
 
+    @Query("UPDATE downloads SET url = :url, updatedAtMillis = :now WHERE id = :id")
+    suspend fun updateUrl(
+        id: String,
+        url: String,
+        now: Long,
+    )
+
     @Query("UPDATE downloads SET destinationPath = :path, updatedAtMillis = :now WHERE id = :id")
     suspend fun updateDestinationPath(
         id: String,

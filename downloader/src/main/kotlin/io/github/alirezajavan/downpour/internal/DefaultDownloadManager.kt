@@ -77,6 +77,7 @@ internal class DefaultDownloadManager(
         logger.i("Enqueued download $id for URL: ${intercepted.url}")
         scope.launch {
             repository.insert(intercepted.toEntity(id, clock()))
+            engine.registerUrlProvider(id, intercepted.urlProvider)
             engine.onEnqueued()
         }
         return id

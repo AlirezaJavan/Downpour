@@ -5,6 +5,8 @@ import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.alirezajavan.downpour.api.Checksum
+import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
+import io.github.alirezajavan.downpour.api.ChunkChecksum
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadItem
 import io.github.alirezajavan.downpour.api.Downpour
@@ -51,6 +53,26 @@ class DownloadsViewModel(
 
                 form.schedule.startTimeMillis?.let { start ->
                     schedule(start, form.schedule.endTimeMillis)
+                }
+
+                if (form.useUrlProvider) {
+                    urlProvider { id, oldUrl ->
+                        SampleEvents.emit("Refreshing URL for $id")
+                        // In a real app, you'd fetch a fresh signed URL here.
+                        // We just append a dummy parameter to demonstrate it works.
+                        val separator = if (oldUrl.contains("?")) "&" else "?"
+                        "$oldUrl$separator$REFRESH_PARAM"
+                    }
+                }
+
+                if (form.useChunkChecksum) {
+                    chunkChecksum(
+                        ChunkChecksum(
+                            chunkSize = CHUNK_SIZE_1MB,
+                            algorithm = ChecksumAlgorithm.SHA256,
+                            checksums = emptyMap(), // Dummy map for sample; in reality would be populated
+                        ),
+                    )
                 }
             },
         )
@@ -103,5 +125,7 @@ class DownloadsViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
+        const val CHUNK_SIZE_1MB = 1024 * 1024L
+        const val REFRESH_PARAM = "refreshed=true"
     }
 }

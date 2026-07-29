@@ -1,5 +1,7 @@
 package io.github.alirezajavan.downpour.internal.engine
 
+import io.github.alirezajavan.downpour.api.ChecksumAlgorithm
+import io.github.alirezajavan.downpour.api.ChunkChecksum
 import io.github.alirezajavan.downpour.api.DownloadDestination
 import io.github.alirezajavan.downpour.api.DownloadError
 import io.github.alirezajavan.downpour.internal.network.HttpDownloadDataSource
@@ -70,6 +72,44 @@ class PartDownloaderTest {
             every { response.code } returns 200 // Should be 206
 
             coEvery { dataSource.open(any(), any(), any(), any(), any()) } returns response
+
+            assertThrows<DownloadError.ContentValidation> {
+                partDownloader.download(context)
+            }
+        }
+
+    @Test
+    fun `download verifies chunk integrity and throws on corruption`() =
+        runTest {
+            val chunkChecksum =
+                ChunkChecksum(
+                    chunkSize = 4,
+                    algorithm = ChecksumAlgorithm.SHA256,
+                    checksums = mapOf(0L to "wrong-checksum"),
+                )
+            val part = PartPlan(0, 0, 0, 4, 0)
+            val context =
+                PartContext(
+                    url = "url",
+                    headers = emptyMap(),
+                    part = part,
+                    ifRange = null,
+                    destination = DownloadDestination.File("path"),
+                    isMultiConnection = false,
+                    progress = AtomicLong(0),
+                    partOffset = AtomicLong(0),
+                    rateLimiters = emptyList(),
+                    chunkChecksum = chunkChecksum,
+                )
+
+            val response = mockk<Response>(relaxed = true)
+            every { response.isSuccessful } returns true
+            every { response.body } returns "data".toResponseBody() // SHA256 of "data" is not "wrong-checksum"
+
+            coEvery { dataSource.open(any(), any(), any(), any(), any()) } returns response
+
+            val sink = mockk<RandomAccessSink>(relaxed = true)
+            every { fileStore.openWritable(any()) } returns sink
 
             assertThrows<DownloadError.ContentValidation> {
                 partDownloader.download(context)

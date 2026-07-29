@@ -14,11 +14,7 @@ public sealed interface DownloadState {
     public data class Completed(
         val destination: DownloadDestination,
         val totalBytes: Long,
-    ) : DownloadState {
-        @Deprecated("Use destination instead")
-        public val filePath: String
-            get() = (destination as? DownloadDestination.File)?.path ?: ""
-    }
+    ) : DownloadState
 
     public data class Failed(
         val error: DownloadError,
